@@ -18,7 +18,7 @@
           <Vendor>MindMotion</Vendor>
           <PackID>MindMotion.MM32SPIN0230_DFP.1.1.2</PackID>
           <PackURL>https://www.mindmotion.com.cn/support/software/keil_pack/</PackURL>
-          <Cpu>IRAM(0x20000000,0x1000) IROM(0x08000000,0x8000) CPUTYPE("Cortex-M0") CLOCK(12000000) ELITTLE</Cpu>
+          <Cpu>IRAM(0x20000000,0x1000) IROM(0x08000000,0x7800) CPUTYPE("Cortex-M0") CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile></StartupFile>
           <FlashDriverDll>UL2CM3(-S0 -C0 -P0 -FD20000000 -FC1000 -FN2 -FF0MM32SPIN0230_32 -FS08000000 -FL08000 -FF1MM32SPIN0230_3 -FS11FE00000 -FL1C00 -FP0($$Device:MM32SPIN0230B1NV$Flash\MM32SPIN0230_32.FLM) -FP1($$Device:MM32SPIN0230B1NV$Flash\MM32SPIN0230_3.FLM))</FlashDriverDll>
@@ -252,7 +252,7 @@
               <IROM>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x8000</Size>
+                <Size>0x7800</Size>
               </IROM>
               <XRAM>
                 <Type>0</Type>
@@ -277,7 +277,7 @@
               <OCR_RVCT4>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x8000</Size>
+                <Size>0x7800</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
                 <Type>1</Type>
@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER,USE_5V</Define>
               <Undefine></Undefine>
-              <IncludePath>..\MM32SPIN0230\Include;..\MM32SPIN0230\HAL_Lib\inc;..\DRIVE\inc;..\SYSTEM\inc;..\USER\inc;..\M1_CONTROL\inc;..\MM_MCLIB\inc;..\MM_MCLIB\inc;..\MY_MC;..\MOTOR_CONTROL;..\MC_CORE</IncludePath>
+              <IncludePath>..\MM32SPIN0230\Include;..\MM32SPIN0230\HAL_Lib\inc;..\DRIVE\inc;..\SYSTEM\inc;..\USER\inc;..\M1_CONTROL\inc;..\MM_MCLIB\inc;..\MM_MCLIB\inc;..\MY_MC;..\MOTOR_CONTROL;..\MC_CORE;..\TM1650</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -418,6 +418,16 @@
               <FileName>flash_data_save.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\USER\flash_data_save.c</FilePath>
+            </File>
+            <File>
+              <FileName>tool_mode.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USER\tool_mode.c</FilePath>
+            </File>
+            <File>
+              <FileName>tm1650.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\TM1650\tm1650.c</FilePath>
             </File>
             <File>
               <FileName>Bat_com.c</FileName>

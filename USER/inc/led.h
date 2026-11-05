@@ -4,20 +4,15 @@
 #include "mm32_device.h"
 #include "hal_conf.h"
 
-/* 新板：PB8=LED行1/DIRCTION，PA14=LED行2/KEY。
- * 阴极COM1/2/3/4=PA13/PA0/PA10/PB9；PA12独立照明。
- * 逻辑灯1..3对应物理LED4..6（电量/报警），逻辑灯4..6对应物理LED1..3（挡位）。 */
-#define LED_LIGHT_RCC_CLOCKGPIO (RCC_AHBENR_GPIOA_Msk)
-#define LED_LIGHT_PORT          GPIOA
-#define LED_LIGHT_PIN           GPIO_Pin_12
-#define LED_ROW1_PORT           GPIOB
-#define LED_ROW1_PIN            GPIO_Pin_8
-#define LED_ROW2_PORT           GPIOA
-#define LED_ROW2_PIN            GPIO_Pin_14
-#define LED_COM1_PIN            GPIO_Pin_13
-#define LED_COM2_PIN            GPIO_Pin_0
-#define LED_COM3_PIN            GPIO_Pin_10
-#define LED_COM4_PIN            GPIO_Pin_9
+/* 飞机板电量三IO：L1=PA14，L2=PA10，L3=PB8。
+ * LED1:L1->L2，LED2:L1->L3，LED3:L3->L1；未使用的一端为模拟高阻。
+ * LED4照明直接接VCC，由PB9整板断电关闭；PA12只用于TM1650 SCL。 */
+#define LED_L1_PORT GPIOA
+#define LED_L1_PIN  GPIO_Pin_14
+#define LED_L2_PORT GPIOA
+#define LED_L2_PIN  GPIO_Pin_10
+#define LED_L3_PORT GPIOB
+#define LED_L3_PIN  GPIO_Pin_8
 
 typedef union
 {
@@ -89,6 +84,8 @@ extern User_LED_Control_t user_led_control;
 void led_init(void);
 void LED_Scan(void);
 void UO_Led_Handler(void);
+/* 前台每次最多一项TM1650事务，避免占用电机中断。 */
+void led_tm1650_handle(void);
 void LedSoc_Run(uint32_t volt_vx100, uint8_t display_en, uint8_t fast_mode);
 uint8_t LedError_Control(void);
 void LedError_Run(void);

@@ -30,6 +30,8 @@ def build(keil, output):
     for name in ("board.h", "mm32_device.h", "mm32spin0230.h", "HAL_device.h", "hal_conf.h", "hal_uid.h"):
         (output / name).write_text('#include "test_hw.h"\n', encoding="utf-8")
     code = ['#include "test_hw.h"', '#include "parameter.h"', '#include "motor_config.h"']
+    # 模式/Flash行为由独立真实ARM回归覆盖，此夹具继续隔离存储外设。
+    code += ['void tool_mode_init(void) {}', 'void tool_mode_save_handle(void) {}']
     code.append(f'#include "{(ROOT / "USER/Bat_com.c").as_posix()}"')
     code.append(extract_function(ROOT / "USER/user_control.c", "void user_state_control(void)"))
     code.append(extract_function(ROOT / "USER/user_control.c", "void user_direction_handle(void)"))

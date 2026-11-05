@@ -28,4 +28,4 @@
   ..\MM32SPIN0230\HAL_Lib\inc\hal_tim.h \
   ..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h \
   ..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h ..\USER\inc\user_control.h \
-  ..\MC_CORE\mc_core.h
+  ..\MC_CORE\mc_core.h ..\USER\inc\tool_mode.h

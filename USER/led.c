@@ -2,171 +2,92 @@
 #include "led.h"
 #include "user_control.h"
 #include "parameter.h"
+#include "tool_mode.h"
+#include "tm1650.h"
 
 User_LED_Control_t user_led_control;
 volatile BITS_UNION ledData;
 static uint8_t led_scan_index;
+static uint8_t tm_display_state=0xff;
 
-/* 与参考顺序一致：先关闭行输出，再清CNF；COM随后准备为推挽高电平。 */
-static void led_rows_off(void)
-{
-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8, 0);
-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14, 0);
-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF8, 0);
-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF14, 0);
-}
-
-static void led_matrix_blank(void)
-{
-	led_rows_off();
-	GPIO_SetBits(GPIOA, LED_COM1_PIN | LED_COM2_PIN | LED_COM3_PIN);
-	GPIO_SetBits(GPIOB, LED_COM4_PIN);
-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE13 | GPIO_CRH_CNF13 | GPIO_CRH_MODE10 | GPIO_CRH_CNF10,
-		(1u << GPIO_CRH_MODE13_Pos) | (1u << GPIO_CRH_MODE10_Pos));
-	MODIFY_REG(GPIOA->CRL, GPIO_CRL_MODE0 | GPIO_CRL_CNF0, 1u << GPIO_CRL_MODE0_Pos);
-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE9 | GPIO_CRH_CNF9, 1u << GPIO_CRH_MODE9_Pos);
-}
-
-/* 参考每轮留4槽全高阻，必须包括PA13/SWDIO公共端及新增COM4。 */
+/* 切灯先让三端模拟高阻，再设置电平并使能选中的阳/阴极，防止串亮。
+ * 只修改L1/L2/L3，不能触碰PB9电源保持、PA11/12总线和PA13方向。 */
 static void led_matrix_release(void)
 {
-	led_rows_off();
-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE13 | GPIO_CRH_MODE10, 0);
-	MODIFY_REG(GPIOA->CRL, GPIO_CRL_MODE0, 0);
-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE9, 0);
-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF13 | GPIO_CRH_CNF10, 0);
-	MODIFY_REG(GPIOA->CRL, GPIO_CRL_CNF0, 0);
-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF9, 0);
-}
-
-static void led_inputs_prepare(void)
-{
-	led_matrix_blank();
-	GPIO_SetBits(GPIOB, LED_ROW1_PIN);
-	GPIO_SetBits(GPIOA, LED_ROW2_PIN);
-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF8, 2u << GPIO_CRH_CNF8_Pos);
-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF14, 2u << GPIO_CRH_CNF14_Pos);
+	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14 | GPIO_CRH_CNF14 | GPIO_CRH_MODE10 | GPIO_CRH_CNF10, 0);
+	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8 | GPIO_CRH_CNF8, 0);
 }
 
 void led_init(void)
 {
-	GPIO_InitTypeDef gpio;
 	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOA_Msk | RCC_AHBENR_GPIOB_Msk, ENABLE);
-	/* 校准后才按参考接管PA13/14；初始化浮空，避免提前持续驱动烧录口。 */
+	/* 校准后接管PA13/14；方向独立上拉输入，PA14灯端先保持高阻。 */
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource14, GPIO_AF_1);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource13, GPIO_AF_1);
-	GPIO_StructInit(&gpio);
-	gpio.GPIO_Pin=LED_COM1_PIN | LED_COM2_PIN | LED_COM3_PIN | LED_ROW2_PIN;
-	gpio.GPIO_Mode=GPIO_Mode_FLOATING;
-	gpio.GPIO_Speed=GPIO_Speed_High;
-	GPIO_Init(GPIOA, &gpio);
-	gpio.GPIO_Pin=LED_COM4_PIN | LED_ROW1_PIN;
-	GPIO_Init(GPIOB, &gpio);
-	GPIO_ResetBits(LED_LIGHT_PORT, LED_LIGHT_PIN);
-	gpio.GPIO_Pin=LED_LIGHT_PIN;
-	gpio.GPIO_Mode=GPIO_Mode_Out_PP;
-	GPIO_Init(LED_LIGHT_PORT, &gpio);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_0);
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_0);
+	led_matrix_release();
+	Bsp_dir_init();
+	Bsp_Key_Init();
 	ledData.Word=0;
 	led_scan_index=0;
+	tm_display_state=0xff;
 	user_list.led_input_valid=0;
 	user_list.Key_Data=1;
 	user_list.Dir_Data=1;
 }
 
-/* 参考6灯12槽扩展为7灯13槽：点灯1..7、全高阻8..11、输入准备12、采样13。
- * PWM=16kHz时，高阻250us、上拉稳定62.5us、整轮812.5us；新板ADC不共用灯脚。 */
+/* 16kHz中断仅扫描电量灯并缓存独立DIR/K1，TM1650通信全部留在前台。
+ * 三灯各一槽，整轮187.5us；采样与点灯不再互相复用。 */
 void LED_Scan(void)
 {
-	uint8_t col;
 	if(!user_list.led_scan_start_flag)
 	{
-		/* 与参考一样不操作GPIO，保留上电时尚未接管的SWD引脚。 */
 		led_scan_index=0;
 		user_list.led_input_valid=0;
 		return;
 	}
-	if(++led_scan_index>13)
+	user_list.Dir_Data=GPIO_ReadInputDataBit(DIR_PORT, DIR_PIN);
+	user_list.Key_Data=GPIO_ReadInputDataBit(KEY_PORT, KEY_PIN);
+	user_list.led_input_valid=1;
+	if(++led_scan_index>3) led_scan_index=1;
+	led_matrix_release();
+	if(user_list.user_state==TOOL_POWER_DOWN || !(ledData.Word & (1u<<led_scan_index))) return;
+	if(led_scan_index==1)
 	{
-		led_scan_index=1;
-	}
-	if(led_scan_index==13)
-	{
-		user_list.Dir_Data=GPIO_ReadInputDataBit(DIR_PORT, DIR_PIN);
-		user_list.Key_Data=GPIO_ReadInputDataBit(KEY_PORT, KEY_PIN);
-		user_list.led_input_valid=1;
-		if(user_list.user_state==TOOL_POWER_DOWN)
-		{
-			led_matrix_release();
-		}
-		else
-		{
-			/* 参考采样后行输出低电平，下一点灯槽再先关闭行输出。 */
-			MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF8, 0);
-			MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF14, 0);
-			GPIO_ResetBits(GPIOB, LED_ROW1_PIN);
-			GPIO_ResetBits(GPIOA, LED_ROW2_PIN);
-			MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8, 1u << GPIO_CRH_MODE8_Pos);
-			MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14, 1u << GPIO_CRH_MODE14_Pos);
-		}
-		return;
-	}
-	if(led_scan_index==8)
-	{
-		led_matrix_release();
-		return;
-	}
-	if(led_scan_index<=11 && led_scan_index>=9)
-	{
-		return;
-	}
-	if(led_scan_index==12)
-	{
-		led_inputs_prepare();
-		return;
-	}
-	if(user_list.user_state==TOOL_POWER_DOWN)
-	{
-		led_matrix_release();
-		return;
-	}
-	led_matrix_blank();
-	if(!(ledData.Word & (1u<<led_scan_index)))
-	{
-		return;
-	}
-	if(led_scan_index>=4 && led_scan_index<=6)
-	{
-		GPIO_SetBits(GPIOB, LED_ROW1_PIN);
-		MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8 | GPIO_CRH_CNF8, 1u<<GPIO_CRH_MODE8_Pos);
-		col=led_scan_index-4;
+		GPIO_SetBits(GPIOA, LED_L1_PIN);
+		GPIO_ResetBits(GPIOA, LED_L2_PIN);
+		MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14 | GPIO_CRH_MODE10,
+			(1u<<GPIO_CRH_MODE14_Pos) | (1u<<GPIO_CRH_MODE10_Pos));
 	}
 	else
 	{
-		GPIO_SetBits(GPIOA, LED_ROW2_PIN);
-		MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14 | GPIO_CRH_CNF14, 1u<<GPIO_CRH_MODE14_Pos);
-		col=(led_scan_index==7) ? 3 : led_scan_index-1;
-	}
-	switch(col)
-	{
-		case 0: GPIO_ResetBits(GPIOA, LED_COM1_PIN); break;
-		case 1: GPIO_ResetBits(GPIOA, LED_COM2_PIN); break;
-		case 2: GPIO_ResetBits(GPIOA, LED_COM3_PIN); break;
-		default: GPIO_ResetBits(GPIOB, LED_COM4_PIN); break;
+		if(led_scan_index==2)
+		{
+			GPIO_SetBits(GPIOA, LED_L1_PIN);
+			GPIO_ResetBits(GPIOB, LED_L3_PIN);
+		}
+		else
+		{
+			GPIO_ResetBits(GPIOA, LED_L1_PIN);
+			GPIO_SetBits(GPIOB, LED_L3_PIN);
+		}
+		MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14, 1u<<GPIO_CRH_MODE14_Pos);
+		MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8, 1u<<GPIO_CRH_MODE8_Pos);
 	}
 }
 
 void UO_Led_Handler(void)
 {
+	uint8_t mask;
 	if(user_list.user_state==TOOL_POWER_DOWN)
 	{
-		GPIO_ResetBits(LED_LIGHT_PORT, LED_LIGHT_PIN);
+		/* LED4照明随整板EN断电，挡位显存和三IO电量灯同时清零。 */
 		ledData.Word=0;
 		user_led_control.LedRunTimes=0;
 		user_led_control.LedDeal=0;
+		TM1650_Clear();
 		return;
 	}
-	/* 照明与矩阵共用5s休眠关灯，取消独立10s/30s计时。 */
-	GPIO_SetBits(LED_LIGHT_PORT, LED_LIGHT_PIN);
 	if(LedError_Control() && user_list.flag.bits.gToolTrigger)
 	{
 		LedError_Run();
@@ -177,26 +98,28 @@ void UO_Led_Handler(void)
 		user_led_control.LedRunTimes=0;
 		LedSoc_Run(user_list.VBus_Vx100, 1, 0);
 	}
-#if Wrench_EN
-	if(mc_core_list.mc_dir==Tool_Dir_CW_Value)
+	/* 实板DIG1绿色、DIG2红色；调速1..4档按LED8/G到LED5/D单灯显示。
+	 * 情景1..3档仍按LED5/D、LED6/E、LED7/F显示，只修正颜色通道。 */
+	mask=(uint8_t)(1u<<(tool_mode_list.mode==TOOL_MODE_SPEED ?
+		(7u-tool_mode_gear()) : (tool_mode_gear()+2u)));
+	TM1650_SetDigit(0, tool_mode_list.mode==TOOL_MODE_SPEED ? mask : 0);
+	TM1650_SetDigit(1, tool_mode_list.mode==TOOL_MODE_SCENE ? mask : 0);
+	TM1650_SetDigit(2, 0);
+	TM1650_SetDigit(3, 0);
+}
+
+void led_tm1650_handle(void)
+{
+	uint8_t cfg=user_list.user_state==TOOL_POWER_DOWN ? TM1650_CFG_OFF : TM1650_CFG_ON;
+	/* 开关设置和显存分帧；失败保持请求，下一可用前台帧重试。 */
+	if(tm_display_state!=cfg)
 	{
-		LED4_ON;
-		LED5=(user_list.gears_level>=1);
-		LED6=(user_list.gears_level>=2);
+		if(TM1650_SetDisplay(cfg)) tm_display_state=cfg;
 	}
 	else
 	{
-		LED4_OFF;
-		LED5=(user_list.flag.bits.gAutoStopEn!=0);
-		LED6_OFF;
+		TM1650_FlushStep();
 	}
-#else
-	LED4_OFF;
-	LED5_OFF;
-	LED6_OFF;
-#endif
-	/* LED7扫描已接入；正常显示用途待确认，暂不增加产品规则。 */
-	LED7_OFF;
 }
 
 uint8_t LedError_Control(void)

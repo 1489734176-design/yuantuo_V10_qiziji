@@ -4,6 +4,7 @@
 #include "motor_control.h"
 #include "drv_adc.h"
 #include "flash_data_save.h"
+#include "tool_mode.h"
 #include "Bat_com.h"
 #include "led.h"
 
@@ -99,6 +100,8 @@ void user_para_init(void)
 {
 	user_list.userErr.word=0;
 	user_list.user_state=TOOL_STOP;
+	/* 中文：双模式默认值先初始化，随后上电read_user_data恢复已提交设置。 */
+	tool_mode_init();
 		user_list.flag.bits.gToolDir= Tool_Dir_Init;
 	/* 扳机为上电来源：首次稳定方向确认后允许本次扣动启动。 */
 	user_list.direction_initialized=0;
@@ -1611,8 +1614,8 @@ void pulse_th_handle(void)
 }
 /**
  * @brief  齿轮/挡位处理
- *        根据当前挡位对目标占空比进行比例缩放
- *        挡位0: PWM_DUTY_GEARS1(50%) 挡位1: PWM_DUTY_GEARS2(80%) 挡位2+: PWM_DUTY_GEARS3(100%)
+ *        调速模式将原扳机范围映射到15%～当前挡上限；情景模式采用固定目标
+ *        保留底层pwm_set软启动斜坡、最低占空比和全部电机保护
  */
 void user_gears_handle(void)
 {
@@ -1700,7 +1703,8 @@ void user_gears_handle(void)
 		motor_control_list.pwm_duty_aim=(motor_control_list.pwm_duty_aim_per*PWM_DUTY_GEARS3)>>15;
 	}
 	#else 
-	motor_control_list.pwm_duty_aim=motor_control_list.pwm_duty_aim_per;
+	/* 中文：调速重映射到本挡上限；情景采用固定目标，保留底层软启动及保护。 */
+	motor_control_list.pwm_duty_aim=tool_mode_duty(motor_control_list.pwm_duty_aim_per);
 	#endif
 }
 /**
@@ -2225,6 +2229,8 @@ void user_state_control(void)
 		
 		case TOOL_POWER_DOWN:
 			user_list.sleep_cnt=0;
+			/* 中文：EN撤销前再执行同一停机保存门控，未停车或写失败时仍保留pending。 */
+			tool_mode_save_handle();
 			GPIO_ResetBits(EN_PORT, EN_PIN);  // 关闭电源使能（进入低功耗）
 			if(user_list.flag.bits.gToolTrigger)
 			{

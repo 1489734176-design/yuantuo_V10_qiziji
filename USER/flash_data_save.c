@@ -1,199 +1,223 @@
 #include "flash_data_save.h"
 #include "user_control.h"
-#define FLASH_START_ADDRESS     ((uint32_t)0x08000000)
-#define FLASH_PAGE_SIZE         (1024)
-#define OffsetAddress         (FLASH_START_ADDRESS + 31 * FLASH_PAGE_SIZE)
+#include "tool_mode.h"
 
-#define DATA_BLOCK_SIZE      20  //数据块大小(半字数)���ݿ��С
-#define DATA_BLOCK_NUM      10   //数据块数量（写入次数）���ݿ���� ��д������
+/* 中文：末两页为事务日志，工程ROM上限必须为30KB，禁止代码落入此区域。 */
+#define FLASH_PAGE0_ADDRESS (0x08007800ul)
+#define FLASH_PAGE1_ADDRESS (0x08007c00ul)
+#define FLASH_PAGE_BYTES    (1024u)
+#define FLASH_SLOT_BYTES    (20u)
+#define FLASH_SLOT_COUNT    (FLASH_PAGE_BYTES/FLASH_SLOT_BYTES)
+#define FLASH_RECORD_WORDS  (8u)
+#define FLASH_RECORD_MAGIC (0xa65au)
+#define FLASH_RECORD_VERSION (1u)
+#define FLASH_LEGACY_MAGIC  (0x55aau)
+#define FLASH_LEGACY_SLOTS  (10u)
 
-
-#define BALANCE_EN  (1)
-
-uint16_t save_data_buf[DATA_BLOCK_SIZE];
-//void write_half_data(uint32_t Address,uint16_t write_data)
-//{
-//		uint32_t real_address;
-//		real_address=OffsetAddress+Address;
-//    FLASH_Unlock();
-
-//    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
-
-//    FLASH_ErasePage(real_address);
-//    FLASH_ClearFlag(FLASH_FLAG_EOP);
-
-//    FLASH_ProgramHalfWord(real_address, write_data);
-//    FLASH_ClearFlag(FLASH_FLAG_EOP);
-
-//    FLASH_Lock();
-//}
-
-uint16_t read_half_data(uint32_t Address)
+/* 中文：新记录8半字：最后提交标志、版本、模式、调速档、情景档、序号低/高、CRC16。 */
+typedef struct
 {
-	  return(*(volatile uint16_t *)(Address));
+	uint32_t page;
+	uint32_t sequence;
+	uint16_t record[FLASH_RECORD_WORDS];
+	uint8_t valid;
+	uint8_t legacy;
+	uint8_t legacy_auto_stop;
+} flash_latest_t;
+
+uint16_t read_half_data(uint32_t address)
+{
+	return *(volatile uint16_t *)address;
 }
 
-
-
-#if(BALANCE_EN)
-void save_data_to_flash(uint16_t* save_data,uint8_t length )
+static uint16_t flash_record_crc(const uint16_t *record)
 {
-	uint16_t read_data_temp;
-//	uint16_t write_data_temp;
-	uint8_t empty_addr_start=0;
-	uint8_t i=0;
-	uint32_t w_ptr;
-	 for(i=0;i<DATA_BLOCK_NUM;i++)  // 遍历所有数据块寻找空块
+	uint16_t crc=0xffffu;
+	uint8_t word;
+	uint8_t byte;
+	uint8_t bit;
+	/* 中文：CRC16-CCITT，按每半字低字节在先覆盖版本至32位序号，标志不参与。 */
+	for(word=1;word<7;word++)
 	{
-	
-	    w_ptr = OffsetAddress+DATA_BLOCK_SIZE*i;
-
-		  read_data_temp=read_half_data(w_ptr);
-			if(read_data_temp!=0x55AA)  // 首字不等于0x55AA表示空块
+		for(byte=0;byte<2;byte++)
+		{
+			crc^=(uint16_t)(((record[word]>>(8u*byte)) & 0xffu)<<8);
+			for(bit=0;bit<8;bit++)
 			{
-				empty_addr_start=i*DATA_BLOCK_SIZE;
-				break;
-			}		
+				crc=(crc & 0x8000u) ? (uint16_t)((crc<<1)^0x1021u) : (uint16_t)(crc<<1);
+			}
+		}
 	}
-	
-			if(i==DATA_BLOCK_NUM)  // 所有块已满，需要擦除
-			{
-			    FLASH_Unlock();
-
-					FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
-
-					FLASH_ErasePage(OffsetAddress);  // 擦除整页
-					FLASH_ClearFlag(FLASH_FLAG_EOP);
-				  empty_addr_start=0;
-			}
-			
-//			write_data_temp=0x55AA;
-//			FLASH_ProgramHalfWord(empty_addr_start+OffsetAddress, write_data_temp);
-		 FLASH_Unlock();
-			for(i=0;i<length;i++)  // 逐半字写入
-			{
-				FLASH_ProgramHalfWord(2*i+empty_addr_start+OffsetAddress, save_data[i]);
-			}
-		 FLASH_Lock();
+	return crc;
 }
 
-
-uint8_t read_data_for_flash(uint16_t *read_data,uint8_t length)
+static uint8_t flash_read_record(uint32_t address,uint16_t *record)
 {
-	uint16_t read_data_temp;
-	uint8_t empty_addr_start=0;
-	uint8_t empty_addr_last=0;
-	uint8_t i=0;
-	uint8_t ret_sta=0;
-	 uint32_t w_ptr;
-	 for(i=0;i<DATA_BLOCK_NUM;i++)
+	uint8_t i;
+	if(read_half_data(address)!=FLASH_RECORD_MAGIC) return 0;
+	for(i=0;i<FLASH_RECORD_WORDS;i++) record[i]=read_half_data(address+2u*i);
+	/* 中文：CRC和范围同时检查，损坏/旧格式/未完成记录均不成为最新设置。 */
+	return record[1]==FLASH_RECORD_VERSION && record[2]<=TOOL_MODE_SCENE &&
+		record[3]>=1 && record[3]<=4 && record[4]>=1 && record[4]<=3 &&
+		record[7]==flash_record_crc(record);
+}
+
+static void flash_find_latest(flash_latest_t *latest)
+{
+	uint32_t page;
+	uint32_t address;
+	uint32_t sequence;
+	uint16_t record[FLASH_RECORD_WORDS];
+	uint8_t page_index;
+	uint8_t slot;
+	uint8_t i;
+	latest->valid=0;
+	latest->legacy=0;
+	latest->sequence=0;
+	latest->legacy_auto_stop=0;
+	for(page_index=0;page_index<2;page_index++)
 	{
-	
-	    w_ptr = OffsetAddress+DATA_BLOCK_SIZE*i;
-
-		  read_data_temp=read_half_data(w_ptr);
-			if(read_data_temp!=0x55AA)
+		page=(page_index==0) ? FLASH_PAGE0_ADDRESS : FLASH_PAGE1_ADDRESS;
+		for(slot=0;slot<FLASH_SLOT_COUNT;slot++)
+		{
+			address=page+(uint32_t)slot*FLASH_SLOT_BYTES;
+			if(!flash_read_record(address,record)) continue;
+			sequence=(uint32_t)record[5] | ((uint32_t)record[6]<<16);
+			/* 中文：无效槽不截断扫描；32位序号按差值处理自然回绕。 */
+			if(!latest->valid || (int32_t)(sequence-latest->sequence)>0)
 			{
-				empty_addr_start=i*DATA_BLOCK_SIZE;
-				break;
-			}				
+				latest->valid=1;
+				latest->page=page;
+				latest->sequence=sequence;
+				for(i=0;i<FLASH_RECORD_WORDS;i++) latest->record[i]=record[i];
+			}
+		}
 	}
-	
-			if(i==DATA_BLOCK_NUM)
+	if(latest->valid) return;
+	/* 中文：仅无新日志时读取旧页31首10槽；旧0/1挡位转换为调速1/2，自动停机仍兼容读取。 */
+	for(slot=0;slot<FLASH_LEGACY_SLOTS;slot++)
+	{
+		address=FLASH_PAGE1_ADDRESS+(uint32_t)slot*FLASH_SLOT_BYTES;
+		if(read_half_data(address)==FLASH_LEGACY_MAGIC &&
+		   read_half_data(address+2)<=1 && read_half_data(address+4)<=1)
 		{
-			empty_addr_start=i*DATA_BLOCK_SIZE;
+			latest->valid=1;
+			latest->legacy=1;
+			latest->page=FLASH_PAGE1_ADDRESS;
+			latest->record[2]=TOOL_MODE_SPEED;
+			latest->record[3]=read_half_data(address+2)+1u;
+			latest->record[4]=1;
+			latest->legacy_auto_stop=(uint8_t)read_half_data(address+4);
 		}
-		if(empty_addr_start==0)
-		{
-//			*read_data=0;
-			ret_sta=0;
-		}
-		else 
-		{
-			empty_addr_last=empty_addr_start-DATA_BLOCK_SIZE;  // 最后一个已写入块
-			for(i=0;i<length;i++)
-			{
-			
-			read_data[i]=read_half_data(2*i+empty_addr_last+OffsetAddress);
-			}
-				
-			if(read_data[0]==0x55AA)  // 校验首字确认数据有效
-			{
-				ret_sta=1;
-			}
-			else 
-			{
-			ret_sta=0;
-			
-			}
-		}
-		
-		return ret_sta;
+	}
 }
-#else
-void save_data_to_flash(uint16_t* save_data,uint8_t length )
+
+static uint32_t flash_find_empty_slot(uint32_t page)
 {
-		uint8_t i=0;
-		uint32_t real_address;
-		real_address=OffsetAddress;
-		FLASH_Unlock();
-
-		FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
-
-		FLASH_ErasePage(OffsetAddress);
-		FLASH_ClearFlag(FLASH_FLAG_EOP);
-		for(i=0;i<length;i++)
+	uint8_t slot;
+	uint8_t word;
+	uint32_t address;
+	for(slot=0;slot<FLASH_SLOT_COUNT;slot++)
+	{
+		address=page+(uint32_t)slot*FLASH_SLOT_BYTES;
+		/* 中文：整个20字节必须擦净，残缺记录不能再次编程，只跳过不覆盖。 */
+		for(word=0;word<FLASH_SLOT_BYTES/2u;word++)
 		{
-			FLASH_ProgramHalfWord(real_address+2*i, save_data[i]);
+			if(read_half_data(address+2u*word)!=0xffffu) break;
 		}
-    FLASH_ClearFlag(FLASH_FLAG_EOP);
-
-
+		if(word==FLASH_SLOT_BYTES/2u) return address;
+	}
+	return 0;
 }
 
-
-uint8_t read_data_for_flash(uint16_t *read_data,uint8_t length)
+uint8_t save_user_data_checked(void)
 {
-			uint8_t i=0;
-			for(i=0;i<length;i++)
-			{
-				read_data[i]=read_half_data(2*i);
-			}
-			return 1;
-
+	flash_latest_t latest;
+	uint16_t record[FLASH_RECORD_WORDS];
+	uint16_t verify[FLASH_RECORD_WORDS];
+	uint32_t page;
+	uint32_t address;
+	uint32_t sequence;
+	uint8_t erase_needed=0;
+	uint8_t i;
+	uint8_t result=0;
+	uint16_t erase_word;
+	/* 中文：拒绝无效RAM配置，失败不清待保存标志。调用者保证前台完全停机。 */
+	if(tool_mode_list.mode>TOOL_MODE_SCENE || tool_mode_list.speed_gear<1 ||
+	   tool_mode_list.speed_gear>4 || tool_mode_list.scene_gear<1 || tool_mode_list.scene_gear>3)
+	{
+		return 0;
+	}
+	flash_find_latest(&latest);
+	page=(latest.valid && !latest.legacy) ? latest.page : FLASH_PAGE0_ADDRESS;
+	address=flash_find_empty_slot(page);
+	if(address==0)
+	{
+		/* 中文：写满后仅擦另一页，最新有效页保留到新记录完整写入且读回成功。 */
+		if(latest.valid && !latest.legacy)
+		{
+			page=(latest.page==FLASH_PAGE0_ADDRESS) ? FLASH_PAGE1_ADDRESS : FLASH_PAGE0_ADDRESS;
+		}
+		erase_needed=1;
+		address=page;
+	}
+	sequence=latest.valid ? latest.sequence+1u : 1u;
+	record[0]=FLASH_RECORD_MAGIC;
+	record[1]=FLASH_RECORD_VERSION;
+	record[2]=tool_mode_list.mode;
+	record[3]=tool_mode_list.speed_gear;
+	record[4]=tool_mode_list.scene_gear;
+	record[5]=(uint16_t)sequence;
+	record[6]=(uint16_t)(sequence>>16);
+	record[7]=flash_record_crc(record);
+	FLASH_Unlock();
+	FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
+	if(erase_needed)
+	{
+		if(FLASH_ErasePage(page)!=FLASH_COMPLETE) goto save_done;
+		/* 中文：擦页成功还须整页读回FFFF，避免残留旧magic使后续半写误成有效记录。 */
+		for(erase_word=0;erase_word<FLASH_PAGE_BYTES/2u;erase_word++)
+		{
+			if(read_half_data(page+2u*erase_word)!=0xffffu) goto save_done;
+		}
+	}
+	/* 中文：先写数据并逐半字读回；最后写magic提交，任何失败都留下可跳过的残缺槽。 */
+	for(i=1;i<FLASH_RECORD_WORDS;i++)
+	{
+		if(FLASH_ProgramHalfWord(address+2u*i,record[i])!=FLASH_COMPLETE ||
+		   read_half_data(address+2u*i)!=record[i]) goto save_done;
+	}
+	if(FLASH_ProgramHalfWord(address,record[0])!=FLASH_COMPLETE) goto save_done;
+	if(!flash_read_record(address,verify)) goto save_done;
+	for(i=0;i<FLASH_RECORD_WORDS;i++)
+	{
+		if(verify[i]!=record[i]) goto save_done;
+	}
+	result=1;
+save_done:
+	FLASH_Lock();
+	return result;
 }
-#endif
 
 void save_user_data(void)
 {
-	save_data_buf[0]=0x55AA;  // 有效数据标志
-	save_data_buf[1]=user_list.gears_level;  // 挡位等级
-	save_data_buf[2]=user_list.flag.bits.gAutoStopEn;  // 自动停机使能
-	save_data_to_flash(save_data_buf,3);
+	/* 中文：保留旧调用接口，同样经停机门控；失败由待保存标志留待后续重试。 */
+	tool_mode_list.save_pending=1;
+	tool_mode_save_handle();
 }
 
 void read_user_data(void)
 {
-
-	u8 res=0;
-	res=read_data_for_flash(save_data_buf,3);
-	if(res==0)
+	flash_latest_t latest;
+	/* 中文：空页或全部损坏时采用默认，不在启动期间重写默认设置。 */
+	tool_mode_init();
+	flash_find_latest(&latest);
+	if(latest.valid)
 	{
-		save_data_buf[1]=1;  // 默认挡位=1
-		save_data_buf[2]=0;  // 默认自动停机=0
+		tool_mode_list.mode=(uint8_t)latest.record[2];
+		tool_mode_list.speed_gear=(uint8_t)latest.record[3];
+		tool_mode_list.scene_gear=(uint8_t)latest.record[4];
 	}
-		
-	user_list.gears_level=save_data_buf[1];
-	if(user_list.gears_level>1)
-	{
-		user_list.gears_level=1;
-	}
-	
-//	user_list.gears_ccw_level=save_data_buf[2];
-	if(save_data_buf[2]>1)
-	{
-		save_data_buf[2]=0;
-	}
-	user_list.flag.bits.gAutoStopEn=save_data_buf[2];
+	user_list.gears_level=tool_mode_gear()-1;
+	user_list.flag.bits.gAutoStopEn=latest.legacy_auto_stop;
 }
-

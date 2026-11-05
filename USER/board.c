@@ -191,7 +191,7 @@ void Bsp_Key_Init(void)
 
 /**
   * @brief 使能端口初始化
-  *        配置PA11为推挽输出（电源保持EN），并置高使能
+  *        飞机板PB9为推挽输出（电源保持EN），并置高使能
   */
 void En_Port_init(void)
 {
@@ -203,7 +203,7 @@ void En_Port_init(void)
     RCC_AHBPeriphClockCmd(EN_PIN_RCC_CLOCKGPIO, ENABLE);		// OK
 	
 	GPIO_SetBits(EN_PORT, EN_PIN);
-	/* PA11 用作 EN，保持普通 GPIO 功能。 */
+	/* 飞机板PB9用作EN，PA11/12留给TM1650总线。 */
 	GPIO_PinAFConfig(EN_PORT, EN_PIN_SRC, EN_PIN_AF);
 	GPIO_InitStructure.GPIO_Pin     =  EN_PIN;
     GPIO_InitStructure.GPIO_Speed   = GPIO_Speed_High;
@@ -288,7 +288,7 @@ void Bsp_Usart_Init(void)
 
 /**
   * @brief 方向检测引脚初始化
-  *        PB8为方向/LED行1复用输入，PB9由LED COM4驱动
+  *        飞机板PA13为独立方向输入；校准后才解除SWDIO复用
   */
 void Bsp_dir_init(void)
 {
@@ -299,7 +299,8 @@ void Bsp_dir_init(void)
 
 	/* LED Clock Enable */
     RCC_AHBPeriphClockCmd(DIR_RCC_CLOCKGPIO, ENABLE);		// OK
-//	GPIO_PinAFConfig(GPIOA, GPIO_PinSource13, GPIO_AF_1);
+/* 校准结束后由led_init调用，保留应用启动前的烧录窗口。 */
+	GPIO_PinAFConfig(DIR_PORT, DIR_PIN_SRC, DIR_PIN_AF);
 	/*Configure GPIO pin : LED_Pin */
 	GPIO_InitStructure.GPIO_Pin     =  DIR_PIN;
     GPIO_InitStructure.GPIO_Speed   = GPIO_Speed_High;
@@ -374,7 +375,7 @@ void Bsp_Gpio_Init(void)
 
 //		Bsp_LED_Init();
 //		LED1_ON();
-		/* DIR/KEY共享灯脚由校准后的led_init接管，先保留PA14的SWD启动窗口。 */
+		/* PA13方向和PA14电量灯由校准后的led_init接管，先保留SWD启动窗口。 */
 }
 /**
   * @brief ADC初始化函数

@@ -66,7 +66,7 @@
 
 
 
-#define LED_SCAN_EN       (1)  // 新板7灯与方向/按键分时复用
+#define LED_SCAN_EN       (1)  // 飞机板三IO电量灯扫描；TM1650挡位灯在前台刷新
 #define PWM_DUTY_GEARS1    (u32)(32768 * 0.5f)  
 #define PWM_DUTY_GEARS2    (u32)(32768 * 0.80f)    
 #define PWM_DUTY_GEARS3    (u32)(32768 * 1.0f) 
@@ -343,8 +343,9 @@
 //#define SOC1_MV                     	                        (u32)((16.2)*100)
 
 	
-#define MOS_NTC_10K_3435K 0
-#define MOS_NTC_100K_3950K 1
+/* 飞机板NTC1=10K/B3435、R41=4.7K；保持95℃保护、85℃恢复。 */
+#define MOS_NTC_10K_3435K 1
+#define MOS_NTC_100K_3950K 0
 #if 	MOS_NTC_10K_3435K
 
 #define RT_60_F 2.965f   //3435K-10k

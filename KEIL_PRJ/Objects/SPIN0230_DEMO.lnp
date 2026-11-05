@@ -5,6 +5,8 @@
 ".\objects\user_control.o"
 ".\objects\led.o"
 ".\objects\flash_data_save.o"
+".\objects\tool_mode.o"
+".\objects\tm1650.o"
 ".\objects\bat_com.o"
 ".\objects\systick.o"
 ".\objects\drv_adc.o"

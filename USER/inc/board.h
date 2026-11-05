@@ -91,26 +91,23 @@
 #define IRMS_PIN                    GPIO_Pin_0
 
 
-#define EN_PIN_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOA_Msk)
-#define EN_PORT                      GPIOA
-#define EN_PIN                       GPIO_Pin_11
-#define EN_PIN_SRC                   GPIO_PinSource11
-#define EN_PIN_AF                    GPIO_AF_1
-
-
-
-#define DIR_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOB_Msk)
-#define DIR_PORT                   GPIOB
-// PB8 与 LED 行1复用；仅在扫描输入窗口读取，低=正转，高=反转。
-#define DIR_PIN                    GPIO_Pin_8
-
+/* 飞机板：PB9电源保持；PA13独立方向；PA0独立K1。
+ * PA11/12由TM1650的SDA/SCL独占，方向/按键不再复用挡位灯。 */
+#define EN_PIN_RCC_CLOCKGPIO       (RCC_AHBENR_GPIOB_Msk)
+#define EN_PORT                    GPIOB
+#define EN_PIN                     GPIO_Pin_9
+#define EN_PIN_SRC                 GPIO_PinSource9
+#define EN_PIN_AF                  GPIO_AF_0
+#define DIR_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOA_Msk)
+#define DIR_PORT                   GPIOA
+#define DIR_PIN                    GPIO_Pin_13
+#define DIR_PIN_SRC                GPIO_PinSource13
+#define DIR_PIN_AF                 GPIO_AF_1
 #define KEY_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOA_Msk)
 #define KEY_PORT                   GPIOA
-// 按键引脚
-#define KEY_PIN                    GPIO_Pin_14
-
-#define KEY_PIN_SRC                GPIO_PinSource14
-#define KEY_PIN_AF                 GPIO_AF_1
+#define KEY_PIN                    GPIO_Pin_0
+#define KEY_PIN_SRC                GPIO_PinSource0
+#define KEY_PIN_AF                 GPIO_AF_0
 
 #define T_BAT_PORT                 GPIOA
 #define T_BAT_PIN                  GPIO_Pin_3
@@ -401,6 +398,9 @@ extern void Bsp_Gpio_Init(void);
 extern void Peripheral_Init(void);
 void Board_ADC_Init(void);
 void Bsp_Adc_Init(void);
+/* 飞机板独立DIR/K1在校准结束后初始化，避免提前接管SWD。 */
+void Bsp_dir_init(void);
+void Bsp_Key_Init(void);
 void En_Port_init(void);
 void Bsp_Com_init(void);                       /* 通信端口(PA11/12/14)初始化 */
 void Bsp_Com_Tx_Mode(uint8_t uart_enable);     /* COM_TX 引脚 UART/GPIO 模式切换 */

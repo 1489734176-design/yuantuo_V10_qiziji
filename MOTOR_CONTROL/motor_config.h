@@ -143,16 +143,16 @@
 *
 *****************************************************************************/
 /* 慢速PWM占空比增减参数（虚拟占空比斜坡） */
-#define PWM_ADD_GAP                2  // 占空比增加间隔（中断次数）
-#define PWM_ADD_VALUE              2  // 占空比增加步进值
+#define PWM_ADD_GAP                6  // 占空比增加间隔（中断次数）
+#define PWM_ADD_VALUE              1  // 占空比增加步进值
 
-#define PWM_SUB_GAP                2  // 占空比减少间隔（中断次数）
-#define PWM_SUB_VALUE              2  // 占空比减少步进值
+#define PWM_SUB_GAP                6  // 占空比减少间隔（中断次数）
+#define PWM_SUB_VALUE              1  // 占空比减少步进值
 
 /* 快速PWM占空比增减参数（实际占空比跟踪） */
-#define PWM_ADD_FAST_GAP                1  // 快速增加间隔
-#define PWM_ADD_FAST_VALUE              2  // 快速增加步进值
+#define PWM_ADD_FAST_GAP                6  // 快速增加间隔
+#define PWM_ADD_FAST_VALUE              1  // 快速增加步进值
 
-#define PWM_SUB_FAST_GAP                1  // 快速减少间隔
-#define PWM_SUB_FAST_VALUE              2  // 快速减少步进值
+#define PWM_SUB_FAST_GAP                6  // 快速减少间隔
+#define PWM_SUB_FAST_VALUE              1  // 快速减少步进值
 #endif

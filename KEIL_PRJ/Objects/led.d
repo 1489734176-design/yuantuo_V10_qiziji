@@ -29,4 +29,5 @@
   ..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h \
   ..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h ..\USER\inc\led.h \
   ..\USER\inc\user_control.h ..\MC_CORE\mc_core.h \
-  ..\USER\inc\parameter.h ..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h
+  ..\USER\inc\parameter.h ..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h \
+  ..\USER\inc\tool_mode.h ..\TM1650\tm1650.h

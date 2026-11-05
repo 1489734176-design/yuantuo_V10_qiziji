@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-03-seven-led-io/tests'
+OUT = ROOT / '.planning/2026-11-04-tm1650/board-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)
@@ -13,11 +13,21 @@ spec.loader.exec_module(runner)
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    code = ['#include "main.h"', '#include "board.h"', '#include "user_control.h"', '#include "parameter.h"', '#include "motor_control.h"', '#include "led.h"', '#include "Bat_com.h"']
+    code = ['#include "main.h"', '#include "board.h"', '#include "user_control.h"', '#include "parameter.h"', '#include "motor_control.h"', '#include "led.h"', '#include "Bat_com.h"', '#include "tool_mode.h"', '#include "tm1650.h"']
     code += ['User_list_Struct user_list;', 'Machine_ERROR_HOLD machine_error_hold;',
              'Mc_core_list mc_core_list;', 'Motor_Control_list motor_control_list;']
+    # 实际LED与模式模块参与测试；只有TM1650总线/Flash硬件被隔离。
+    code += ['static uint8_t test_tm_digit[4];',
+             'void TM1650_SetDigit(uint8_t i,uint8_t d) { if(i<4) test_tm_digit[i]=d; }',
+             'uint8_t TM1650_GetDigit(uint8_t i) { return i<4 ? test_tm_digit[i] : 0; }',
+             'void TM1650_Clear(void) { unsigned i; for(i=0;i<4;i++) test_tm_digit[i]=0; }',
+             'uint8_t TM1650_SetDisplay(uint8_t cfg) { return 1; }',
+             'uint8_t TM1650_FlushStep(void) { return 1; }',
+             'uint8_t TM1650_ReadKey(uint8_t *key) { return 0; }',
+             'uint8_t save_user_data_checked(void) { return 1; }']
     code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void user_direction_handle(void)'))
     code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'u8 key_scan(void)'))
+    code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void User_Temperature_Handler(void)'))
     code += ['void Bsp_Op_Init(void) {}', 'void Bsp_Comp_Init(void) {}',
              'void Bsp_Adc_Init(void) {}', 'void Bsp_Pwm_Init(void) {}']
     for signature in ['void Bsp_Key_Init(void)', 'void Bsp_dir_init(void)', 'void Bsp_Gpio_Init(void)']:
@@ -34,11 +44,11 @@ def main():
                '-fdata-sections', '-DUSE_STDPERIPH_DRIVER', '-DUSE_5V',
                '-Wno-invalid-source-encoding', '-Wno-nonportable-include-path',
                '-Wl,--ro-base=0x08000000,--rw-base=0x20000000,--entry=run_tests',
-               '-o', str(image), str(source), str(ROOT / 'USER/led.c'),
+               '-o', str(image), str(source), str(ROOT / 'USER/led.c'), str(ROOT / 'USER/tool_mode.c'),
                str(ROOT / 'MM32SPIN0230/HAL_Lib/src/hal_gpio.c'),
                str(ROOT / 'MM32SPIN0230/HAL_Lib/src/hal_rcc.c'),
                str(ROOT / 'MM32SPIN0230/HAL_Lib/src/hal_tim.c')]
-    for path in ['USER/inc', 'MOTOR_CONTROL', 'MC_CORE', 'DRIVE/inc', 'SYSTEM/inc',
+    for path in ['USER/inc', 'TM1650', 'MOTOR_CONTROL', 'MC_CORE', 'DRIVE/inc', 'SYSTEM/inc',
                  'MM32SPIN0230/Include', 'MM32SPIN0230/HAL_Lib/inc', 'CMSIS/Core/Include']:
         command += ['-I', str(ROOT / path)]
     subprocess.run(command, check=True, cwd=ROOT)

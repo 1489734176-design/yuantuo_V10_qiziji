@@ -1,0 +1,1831 @@
+--- original/USER/board.c
++++ USER/board.c
+@@ -186,29 +186,29 @@
+     GPIO_StructInit(&gpio);
+     gpio.GPIO_Pin = KEY_PIN;
+     gpio.GPIO_Mode = GPIO_Mode_IPU;
+     GPIO_Init(KEY_PORT, &gpio);
+ }
+ 
+ /**
+   * @brief 使能端口初始化
+-  *        配置PA11为推挽输出（电源保持EN），并置高使能
++  *        飞机板PB9为推挽输出（电源保持EN），并置高使能
+   */
+ void En_Port_init(void)
+ {
+ 
+     GPIO_InitTypeDef GPIO_InitStructure;
+     GPIO_StructInit(&GPIO_InitStructure);
+ 
+ 	/* LED Clock Enable */
+     RCC_AHBPeriphClockCmd(EN_PIN_RCC_CLOCKGPIO, ENABLE);		// OK
+ 	
+ 	GPIO_SetBits(EN_PORT, EN_PIN);
+-	/* PA11 用作 EN，保持普通 GPIO 功能。 */
++	/* 飞机板PB9用作EN，PA11/12留给TM1650总线。 */
+ 	GPIO_PinAFConfig(EN_PORT, EN_PIN_SRC, EN_PIN_AF);
+ 	GPIO_InitStructure.GPIO_Pin     =  EN_PIN;
+     GPIO_InitStructure.GPIO_Speed   = GPIO_Speed_High;
+     GPIO_InitStructure.GPIO_Mode    = GPIO_Mode_Out_PP;
+     GPIO_Init(EN_PORT, &GPIO_InitStructure);
+ }
+ 
+ /**
+@@ -283,28 +283,29 @@
+     USART_Init(USART1, &USART_InitStruct);
+ 
+     USART_Cmd(USART1, ENABLE);
+     NVIC_SetPriority(USART1_IRQn, 2);
+ }
+ 
+ /**
+   * @brief 方向检测引脚初始化
+-  *        PB8为方向/LED行1复用输入，PB9由LED COM4驱动
++  *        飞机板PA13为独立方向输入；校准后才解除SWDIO复用
+   */
+ void Bsp_dir_init(void)
+ {
+     GPIO_InitTypeDef GPIO_InitStructure;
+     GPIO_StructInit(&GPIO_InitStructure);
+ 
+ 
+ 
+ 	/* LED Clock Enable */
+     RCC_AHBPeriphClockCmd(DIR_RCC_CLOCKGPIO, ENABLE);		// OK
+-//	GPIO_PinAFConfig(GPIOA, GPIO_PinSource13, GPIO_AF_1);
++/* 校准结束后由led_init调用，保留应用启动前的烧录窗口。 */
++	GPIO_PinAFConfig(DIR_PORT, DIR_PIN_SRC, DIR_PIN_AF);
+ 	/*Configure GPIO pin : LED_Pin */
+ 	GPIO_InitStructure.GPIO_Pin     =  DIR_PIN;
+     GPIO_InitStructure.GPIO_Speed   = GPIO_Speed_High;
+     GPIO_InitStructure.GPIO_Mode    = GPIO_Mode_IPU;
+     GPIO_Init(DIR_PORT, &GPIO_InitStructure);
+ 
+ 
+ }
+@@ -369,17 +370,17 @@
+     Bsp_Op_Init();
+ 		Bsp_Comp_Init();
+     Bsp_Adc_Init();
+ 		Bsp_Pwm_Init();
+ //		led_init();
+ 
+ //		Bsp_LED_Init();
+ //		LED1_ON();
+-		/* DIR/KEY共享灯脚由校准后的led_init接管，先保留PA14的SWD启动窗口。 */
++		/* PA13方向和PA14电量灯由校准后的led_init接管，先保留SWD启动窗口。 */
+ }
+ /**
+   * @brief ADC初始化函数
+   *        配置ADC扫描通道序列（BEMF_U/V/W、OP_O、ISUMAVG、VR、VBUS、T_BAT、T_MOS）
+   *        使用TIM1_CC4触发ADC转换
+   * @param None
+   * @retval None
+   */
+--- original/USER/inc/board.h
++++ USER/inc/board.h
+@@ -86,36 +86,33 @@
+ 
+ #define ISUMAVG_PORT             		GPIOA
+ #define ISUMAVG_PIN             		GPIO_Pin_5
+ 
+ #define IRMS_PORT                   GPIOB
+ #define IRMS_PIN                    GPIO_Pin_0
+ 
+ 
+-#define EN_PIN_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOA_Msk)
+-#define EN_PORT                      GPIOA
+-#define EN_PIN                       GPIO_Pin_11
+-#define EN_PIN_SRC                   GPIO_PinSource11
+-#define EN_PIN_AF                    GPIO_AF_1
+-
+-
+-
+-#define DIR_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOB_Msk)
+-#define DIR_PORT                   GPIOB
+-// PB8 与 LED 行1复用；仅在扫描输入窗口读取，低=正转，高=反转。
+-#define DIR_PIN                    GPIO_Pin_8
+-
++/* 飞机板：PB9电源保持；PA13独立方向；PA0独立K1。
++ * PA11/12由TM1650的SDA/SCL独占，方向/按键不再复用挡位灯。 */
++#define EN_PIN_RCC_CLOCKGPIO       (RCC_AHBENR_GPIOB_Msk)
++#define EN_PORT                    GPIOB
++#define EN_PIN                     GPIO_Pin_9
++#define EN_PIN_SRC                 GPIO_PinSource9
++#define EN_PIN_AF                  GPIO_AF_0
++#define DIR_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOA_Msk)
++#define DIR_PORT                   GPIOA
++#define DIR_PIN                    GPIO_Pin_13
++#define DIR_PIN_SRC                GPIO_PinSource13
++#define DIR_PIN_AF                 GPIO_AF_1
+ #define KEY_RCC_CLOCKGPIO          (RCC_AHBENR_GPIOA_Msk)
+ #define KEY_PORT                   GPIOA
+-// 按键引脚
+-#define KEY_PIN                    GPIO_Pin_14
+-
+-#define KEY_PIN_SRC                GPIO_PinSource14
+-#define KEY_PIN_AF                 GPIO_AF_1
++#define KEY_PIN                    GPIO_Pin_0
++#define KEY_PIN_SRC                GPIO_PinSource0
++#define KEY_PIN_AF                 GPIO_AF_0
+ 
+ #define T_BAT_PORT                 GPIOA
+ #define T_BAT_PIN                  GPIO_Pin_3
+ 
+ #define T_MOS_PORT                   GPIOA
+ // MOS温度NTC引脚
+ #define T_MOS_PIN                    GPIO_Pin_4
+ 
+@@ -396,16 +393,19 @@
+  * @{
+  */
+ 
+ 
+ extern void Bsp_Gpio_Init(void);
+ extern void Peripheral_Init(void);
+ void Board_ADC_Init(void);
+ void Bsp_Adc_Init(void);
++/* 飞机板独立DIR/K1在校准结束后初始化，避免提前接管SWD。 */
++void Bsp_dir_init(void);
++void Bsp_Key_Init(void);
+ void En_Port_init(void);
+ void Bsp_Com_init(void);                       /* 通信端口(PA11/12/14)初始化 */
+ void Bsp_Com_Tx_Mode(uint8_t uart_enable);     /* COM_TX 引脚 UART/GPIO 模式切换 */
+ void Bsp_Usart_Init(void);                     /* USART1 初始化(4800 8N1) */
+ 
+ /**
+   * @}
+ */
+--- original/USER/led.c
++++ USER/led.c
+@@ -1,207 +1,128 @@
+ #include "board.h"
+ #include "led.h"
+ #include "user_control.h"
+ #include "parameter.h"
++#include "tool_mode.h"
++#include "tm1650.h"
+ 
+ User_LED_Control_t user_led_control;
+ volatile BITS_UNION ledData;
+ static uint8_t led_scan_index;
+-
+-/* 与参考顺序一致：先关闭行输出，再清CNF；COM随后准备为推挽高电平。 */
+-static void led_rows_off(void)
+-{
+-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8, 0);
+-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14, 0);
+-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF8, 0);
+-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF14, 0);
+-}
+-
+-static void led_matrix_blank(void)
+-{
+-	led_rows_off();
+-	GPIO_SetBits(GPIOA, LED_COM1_PIN | LED_COM2_PIN | LED_COM3_PIN);
+-	GPIO_SetBits(GPIOB, LED_COM4_PIN);
+-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE13 | GPIO_CRH_CNF13 | GPIO_CRH_MODE10 | GPIO_CRH_CNF10,
+-		(1u << GPIO_CRH_MODE13_Pos) | (1u << GPIO_CRH_MODE10_Pos));
+-	MODIFY_REG(GPIOA->CRL, GPIO_CRL_MODE0 | GPIO_CRL_CNF0, 1u << GPIO_CRL_MODE0_Pos);
+-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE9 | GPIO_CRH_CNF9, 1u << GPIO_CRH_MODE9_Pos);
+-}
+-
+-/* 参考每轮留4槽全高阻，必须包括PA13/SWDIO公共端及新增COM4。 */
++static uint8_t tm_display_state=0xff;
++
++/* 切灯先让三端模拟高阻，再设置电平并使能选中的阳/阴极，防止串亮。
++ * 只修改L1/L2/L3，不能触碰PB9电源保持、PA11/12总线和PA13方向。 */
+ static void led_matrix_release(void)
+ {
+-	led_rows_off();
+-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE13 | GPIO_CRH_MODE10, 0);
+-	MODIFY_REG(GPIOA->CRL, GPIO_CRL_MODE0, 0);
+-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE9, 0);
+-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF13 | GPIO_CRH_CNF10, 0);
+-	MODIFY_REG(GPIOA->CRL, GPIO_CRL_CNF0, 0);
+-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF9, 0);
+-}
+-
+-static void led_inputs_prepare(void)
+-{
+-	led_matrix_blank();
+-	GPIO_SetBits(GPIOB, LED_ROW1_PIN);
+-	GPIO_SetBits(GPIOA, LED_ROW2_PIN);
+-	MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF8, 2u << GPIO_CRH_CNF8_Pos);
+-	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF14, 2u << GPIO_CRH_CNF14_Pos);
++	MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14 | GPIO_CRH_CNF14 | GPIO_CRH_MODE10 | GPIO_CRH_CNF10, 0);
++	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8 | GPIO_CRH_CNF8, 0);
+ }
+ 
+ void led_init(void)
+ {
+-	GPIO_InitTypeDef gpio;
+ 	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOA_Msk | RCC_AHBENR_GPIOB_Msk, ENABLE);
+-	/* 校准后才按参考接管PA13/14；初始化浮空，避免提前持续驱动烧录口。 */
++	/* 校准后接管PA13/14；方向独立上拉输入，PA14灯端先保持高阻。 */
+ 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource14, GPIO_AF_1);
+-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource13, GPIO_AF_1);
+-	GPIO_StructInit(&gpio);
+-	gpio.GPIO_Pin=LED_COM1_PIN | LED_COM2_PIN | LED_COM3_PIN | LED_ROW2_PIN;
+-	gpio.GPIO_Mode=GPIO_Mode_FLOATING;
+-	gpio.GPIO_Speed=GPIO_Speed_High;
+-	GPIO_Init(GPIOA, &gpio);
+-	gpio.GPIO_Pin=LED_COM4_PIN | LED_ROW1_PIN;
+-	GPIO_Init(GPIOB, &gpio);
+-	GPIO_ResetBits(LED_LIGHT_PORT, LED_LIGHT_PIN);
+-	gpio.GPIO_Pin=LED_LIGHT_PIN;
+-	gpio.GPIO_Mode=GPIO_Mode_Out_PP;
+-	GPIO_Init(LED_LIGHT_PORT, &gpio);
++	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_0);
++	GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_0);
++	led_matrix_release();
++	Bsp_dir_init();
++	Bsp_Key_Init();
+ 	ledData.Word=0;
+ 	led_scan_index=0;
++	tm_display_state=0xff;
+ 	user_list.led_input_valid=0;
+ 	user_list.Key_Data=1;
+ 	user_list.Dir_Data=1;
+ }
+ 
+-/* 参考6灯12槽扩展为7灯13槽：点灯1..7、全高阻8..11、输入准备12、采样13。
+- * PWM=16kHz时，高阻250us、上拉稳定62.5us、整轮812.5us；新板ADC不共用灯脚。 */
++/* 16kHz中断仅扫描电量灯并缓存独立DIR/K1，TM1650通信全部留在前台。
++ * 三灯各一槽，整轮187.5us；采样与点灯不再互相复用。 */
+ void LED_Scan(void)
+ {
+-	uint8_t col;
+ 	if(!user_list.led_scan_start_flag)
+ 	{
+-		/* 与参考一样不操作GPIO，保留上电时尚未接管的SWD引脚。 */
+ 		led_scan_index=0;
+ 		user_list.led_input_valid=0;
+ 		return;
+ 	}
+-	if(++led_scan_index>13)
+-	{
+-		led_scan_index=1;
+-	}
+-	if(led_scan_index==13)
+-	{
+-		user_list.Dir_Data=GPIO_ReadInputDataBit(DIR_PORT, DIR_PIN);
+-		user_list.Key_Data=GPIO_ReadInputDataBit(KEY_PORT, KEY_PIN);
+-		user_list.led_input_valid=1;
+-		if(user_list.user_state==TOOL_POWER_DOWN)
+-		{
+-			led_matrix_release();
++	user_list.Dir_Data=GPIO_ReadInputDataBit(DIR_PORT, DIR_PIN);
++	user_list.Key_Data=GPIO_ReadInputDataBit(KEY_PORT, KEY_PIN);
++	user_list.led_input_valid=1;
++	if(++led_scan_index>3) led_scan_index=1;
++	led_matrix_release();
++	if(user_list.user_state==TOOL_POWER_DOWN || !(ledData.Word & (1u<<led_scan_index))) return;
++	if(led_scan_index==1)
++	{
++		GPIO_SetBits(GPIOA, LED_L1_PIN);
++		GPIO_ResetBits(GPIOA, LED_L2_PIN);
++		MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14 | GPIO_CRH_MODE10,
++			(1u<<GPIO_CRH_MODE14_Pos) | (1u<<GPIO_CRH_MODE10_Pos));
++	}
++	else
++	{
++		if(led_scan_index==2)
++		{
++			GPIO_SetBits(GPIOA, LED_L1_PIN);
++			GPIO_ResetBits(GPIOB, LED_L3_PIN);
+ 		}
+ 		else
+ 		{
+-			/* 参考采样后行输出低电平，下一点灯槽再先关闭行输出。 */
+-			MODIFY_REG(GPIOB->CRH, GPIO_CRH_CNF8, 0);
+-			MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF14, 0);
+-			GPIO_ResetBits(GPIOB, LED_ROW1_PIN);
+-			GPIO_ResetBits(GPIOA, LED_ROW2_PIN);
+-			MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8, 1u << GPIO_CRH_MODE8_Pos);
+-			MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14, 1u << GPIO_CRH_MODE14_Pos);
+-		}
+-		return;
+-	}
+-	if(led_scan_index==8)
+-	{
+-		led_matrix_release();
+-		return;
+-	}
+-	if(led_scan_index<=11 && led_scan_index>=9)
+-	{
+-		return;
+-	}
+-	if(led_scan_index==12)
+-	{
+-		led_inputs_prepare();
+-		return;
+-	}
++			GPIO_ResetBits(GPIOA, LED_L1_PIN);
++			GPIO_SetBits(GPIOB, LED_L3_PIN);
++		}
++		MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14, 1u<<GPIO_CRH_MODE14_Pos);
++		MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8, 1u<<GPIO_CRH_MODE8_Pos);
++	}
++}
++
++void UO_Led_Handler(void)
++{
++	uint8_t mask;
+ 	if(user_list.user_state==TOOL_POWER_DOWN)
+ 	{
+-		led_matrix_release();
+-		return;
+-	}
+-	led_matrix_blank();
+-	if(!(ledData.Word & (1u<<led_scan_index)))
+-	{
+-		return;
+-	}
+-	if(led_scan_index>=4 && led_scan_index<=6)
+-	{
+-		GPIO_SetBits(GPIOB, LED_ROW1_PIN);
+-		MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8 | GPIO_CRH_CNF8, 1u<<GPIO_CRH_MODE8_Pos);
+-		col=led_scan_index-4;
+-	}
+-	else
+-	{
+-		GPIO_SetBits(GPIOA, LED_ROW2_PIN);
+-		MODIFY_REG(GPIOA->CRH, GPIO_CRH_MODE14 | GPIO_CRH_CNF14, 1u<<GPIO_CRH_MODE14_Pos);
+-		col=(led_scan_index==7) ? 3 : led_scan_index-1;
+-	}
+-	switch(col)
+-	{
+-		case 0: GPIO_ResetBits(GPIOA, LED_COM1_PIN); break;
+-		case 1: GPIO_ResetBits(GPIOA, LED_COM2_PIN); break;
+-		case 2: GPIO_ResetBits(GPIOA, LED_COM3_PIN); break;
+-		default: GPIO_ResetBits(GPIOB, LED_COM4_PIN); break;
+-	}
+-}
+-
+-void UO_Led_Handler(void)
+-{
+-	if(user_list.user_state==TOOL_POWER_DOWN)
+-	{
+-		GPIO_ResetBits(LED_LIGHT_PORT, LED_LIGHT_PIN);
++		/* LED4照明随整板EN断电，挡位显存和三IO电量灯同时清零。 */
+ 		ledData.Word=0;
+ 		user_led_control.LedRunTimes=0;
+ 		user_led_control.LedDeal=0;
++		TM1650_Clear();
+ 		return;
+ 	}
+-	/* 照明与矩阵共用5s休眠关灯，取消独立10s/30s计时。 */
+-	GPIO_SetBits(LED_LIGHT_PORT, LED_LIGHT_PIN);
+ 	if(LedError_Control() && user_list.flag.bits.gToolTrigger)
+ 	{
+ 		LedError_Run();
+ 	}
+ 	else
+ 	{
+ 		user_led_control.LedDeal=0;
+ 		user_led_control.LedRunTimes=0;
+ 		LedSoc_Run(user_list.VBus_Vx100, 1, 0);
+ 	}
+-#if Wrench_EN
+-	if(mc_core_list.mc_dir==Tool_Dir_CW_Value)
+-	{
+-		LED4_ON;
+-		LED5=(user_list.gears_level>=1);
+-		LED6=(user_list.gears_level>=2);
++	/* LED5/6/7/8分别是D/E/F/G，DIG1红色、DIG2绿色，严格单灯显示。 */
++	mask=(uint8_t)(1u<<(tool_mode_gear()+2u));
++	TM1650_SetDigit(0, tool_mode_list.mode==TOOL_MODE_SCENE ? mask : 0);
++	TM1650_SetDigit(1, tool_mode_list.mode==TOOL_MODE_SPEED ? mask : 0);
++	TM1650_SetDigit(2, 0);
++	TM1650_SetDigit(3, 0);
++}
++
++void led_tm1650_handle(void)
++{
++	uint8_t cfg=user_list.user_state==TOOL_POWER_DOWN ? TM1650_CFG_OFF : TM1650_CFG_ON;
++	/* 开关设置和显存分帧；失败保持请求，下一可用前台帧重试。 */
++	if(tm_display_state!=cfg)
++	{
++		if(TM1650_SetDisplay(cfg)) tm_display_state=cfg;
+ 	}
+ 	else
+ 	{
+-		LED4_OFF;
+-		LED5=(user_list.flag.bits.gAutoStopEn!=0);
+-		LED6_OFF;
+-	}
+-#else
+-	LED4_OFF;
+-	LED5_OFF;
+-	LED6_OFF;
+-#endif
+-	/* LED7扫描已接入；正常显示用途待确认，暂不增加产品规则。 */
+-	LED7_OFF;
++		TM1650_FlushStep();
++	}
+ }
+ 
+ uint8_t LedError_Control(void)
+ {
+ #if RESTAR_EN
+ 	if(machine_error_hold.userErr_hold.word==0 &&
+ 	   (machine_error_hold.MC_error_hold.word & 0xfffb)==0 &&
+ 	   (!machine_error_hold.MC_error_hold.bits.gBlock || user_list.Load_exist<RESTAR_COUNT))
+--- original/USER/inc/led.h
++++ USER/inc/led.h
+@@ -1,28 +1,23 @@
+ #ifndef __LED_H
+ #define __LED_H
+ #include <stdio.h>
+ #include "mm32_device.h"
+ #include "hal_conf.h"
+ 
+-/* 新板：PB8=LED行1/DIRCTION，PA14=LED行2/KEY。
+- * 阴极COM1/2/3/4=PA13/PA0/PA10/PB9；PA12独立照明。
+- * 逻辑灯1..3对应物理LED4..6（电量/报警），逻辑灯4..6对应物理LED1..3（挡位）。 */
+-#define LED_LIGHT_RCC_CLOCKGPIO (RCC_AHBENR_GPIOA_Msk)
+-#define LED_LIGHT_PORT          GPIOA
+-#define LED_LIGHT_PIN           GPIO_Pin_12
+-#define LED_ROW1_PORT           GPIOB
+-#define LED_ROW1_PIN            GPIO_Pin_8
+-#define LED_ROW2_PORT           GPIOA
+-#define LED_ROW2_PIN            GPIO_Pin_14
+-#define LED_COM1_PIN            GPIO_Pin_13
+-#define LED_COM2_PIN            GPIO_Pin_0
+-#define LED_COM3_PIN            GPIO_Pin_10
+-#define LED_COM4_PIN            GPIO_Pin_9
++/* 飞机板电量三IO：L1=PA14，L2=PA10，L3=PB8。
++ * LED1:L1->L2，LED2:L1->L3，LED3:L3->L1；未使用的一端为模拟高阻。
++ * LED4照明直接接VCC，由PB9整板断电关闭；PA12只用于TM1650 SCL。 */
++#define LED_L1_PORT GPIOA
++#define LED_L1_PIN  GPIO_Pin_14
++#define LED_L2_PORT GPIOA
++#define LED_L2_PIN  GPIO_Pin_10
++#define LED_L3_PORT GPIOB
++#define LED_L3_PIN  GPIO_Pin_8
+ 
+ typedef union
+ {
+     uint8_t Word;
+     struct
+     {
+         uint8_t gB0:1, gB1:1, gB2:1, gB3:1, gB4:1, gB5:1, gB6:1, gB7:1;
+     } bits;
+@@ -84,12 +79,14 @@
+     uint16_t LedRunCnt_Once;
+     uint8_t gSocUpdate;
+ } User_LED_Control_t;
+ 
+ extern User_LED_Control_t user_led_control;
+ void led_init(void);
+ void LED_Scan(void);
+ void UO_Led_Handler(void);
++/* 前台每次最多一项TM1650事务，避免占用电机中断。 */
++void led_tm1650_handle(void);
+ void LedSoc_Run(uint32_t volt_vx100, uint8_t display_en, uint8_t fast_mode);
+ uint8_t LedError_Control(void);
+ void LedError_Run(void);
+ #endif
+--- original/USER/main.c
++++ USER/main.c
+@@ -25,16 +25,18 @@
+ #include "user_control.h"
+ #include "drv_pwm.h"
+ #include "parameter.h"
+ #include "mc_core.h"
+ #include "systick.h"
+ #include "motor_control.h"
+ #include "flash_data_save.h"
+ #include "led.h"
++#include "tool_mode.h"
++#include "tm1650.h"
+ #include "Bat_com.h"
+ 
+ /**
+  * @addtogroup MM32_User_Layer
+  * @{
+  */
+ 
+ //DiagFlag 								DiagnoseFAULT;
+@@ -100,16 +102,17 @@
+  * @brief  主函数 - 系统初始化及主循环
+  *         完成外设初始化、参数校准、电压/温度检测及电机控制状态机调度
+  */
+ int main(void)
+ {
+ 	/* Configure the clock */
+ 
+ 	u8 i;
++	uint8_t tm_bus_used; // 前台每1ms最多一次TM1650读写事务
+ 	//led_init();
+ 	#if LIMIT_SPEED_EN
+ 		u16 speed_pi_fer_count=0;
+ 	#endif
+ 	/* 初始化滴答定时器 */
+ 	Systick_Init(0x00ffffff);
+ 	
+ 	/* 上电飞钻检测已取消（PA12 现用于照明输出） */
+@@ -135,21 +138,23 @@
+ 	/* 上电飞钻检测（在user_para_init之后执行） */
+ 	mose_check();	//需在user_para_init()之后
+ 	systick_delay_us(1000);
+ 	/* 从Flash读取用户数据（挡位、自动停机设置） */
+ 	read_user_data();//需在user_para_init()之后
+ 	/* 电机控制核心初始化 */
+ 	mc_init();
+ 
+-	/* 电源保持端口初始化（EN = PA11） */
++	/* 飞机板电源保持PB9，PA11/12专用于TM1650。 */
+ 	En_Port_init();
+ 	GPIO_WriteBit(EN_PORT, EN_PIN , Bit_SET);
+ 	/* LED初始化 */
+ 	led_init();
++	/* 总线初始化在电机中断开放之前，上电等待不影响运行保护。 */
++	TM1650_Init();
+ 
+ 	/* 电池通信初始化：配置端口、清零电池数据并启动通信链路 */
+ 	Bsp_Com_init();
+ 	memset(&BatData, 0, sizeof(BATDATA));
+ 	Bat_Com_Restart();
+ 	
+ 	/* 中断初始化（ADC、TIM1、TIM14、TIM6、TIM13） */
+ 	Interrupt_Init();
+@@ -157,17 +162,17 @@
+ 	user_list.led_scan_start_flag=1;
+ 	systick_delay_us(5000);//等待ADC稳定
+ 	/* 先滤波上电扳机；首次方向确认允许当前扣动启动，后续换向仍需松手。 */
+ 	for(i=0;i<30;i++)
+ 	{
+ 		systick_delay_us(1000);
+ 		motor_on_off_control();
+ 	}
+-	/* 每次方向去抖之前等待新的复用输入采样。 */
++	/* 每次方向去抖之前等待独立PA13方向输入的新采样。 */
+ 	for(i=0;i<20;i++)
+ 	{
+ 		systick_delay_us(1000);
+ 		user_direction_handle();
+ 	}
+ 
+ 	/* 上电时快速检测电压状态 */
+ 	Volt_Handler_fast();
+@@ -209,16 +214,18 @@
+ 			Volt_Handler();
+ //			debug_motor_on_off();
+ 			/* 电机开关控制（扳机信号检测） */
+ 			motor_on_off_control();
+ 			/* 平均电流过流保护 */
+ 			user_oc_handle();
+ 			/* MOS温度保护 */
+ 			User_Temperature_Handler();
++			/* 先处理模式/挡位，读键与显示刷新分帧，长按不会连加。 */
++			tm_bus_used=tool_mode_key_handle();
+ 			/* 目标PWM占空比计算（扳机电压映射） */
+ 			pwm_duty_aim_deal();
+ 
+ 			#if(Wrench_EN)
+ 				/* 电动扳手按键处理（挡位切换、自动停机） */
+ 				user_WrenchKey_Handler();
+ 			#else
+ 				/* 齿轮/挡位处理 */
+@@ -251,28 +258,32 @@
+ 			}
+ 			#endif
+ 			/* 工具状态机控制（停止/运行/报错/休眠） */
+ 			user_state_control();
+ 			/* 故障锁存更新 */
+ 			error_hold_updata();
+ 			/* LED显示处理（电量/挡位/故障） */
+ 			UO_Led_Handler();
++			/* 空闲帧刷新TM1650；每次仅一个配置或显存事务。 */
++			if(!tm_bus_used) led_tm1650_handle();
+ 			/* 根据状态机设置电机使能标志 */
+ 			/* 需同时满足工具许可、电池通信许可、无实时及锁存故障 */
+ 			if(user_list.flag.bits.gToolEn && Bat_Com_CanRun() &&
+ 			   user_list.userErr.word == 0 && mc_core_list.MC_error.word == 0 &&
+ 			   machine_error_hold.userErr_hold.word == 0 && machine_error_hold.MC_error_hold.word == 0)
+ 			{
+ 				mc_core_list.motor_en=1;
+ 			}
+ 			else
+ 			{
+ 				mc_core_list.motor_en=0;
+ 			}
++			/* 发布使能状态后，只有松扳机且电机完全停止才提交掉电设置。 */
++			tool_mode_save_handle();
+ 			/* 初始位置检测（IPD）触发
+ 			   同样受通信许可、电机使能、POSITION 状态及故障门控，
+ 			   取消启动时清除残留 IPD 请求，避免旁路许可执行检测 */
+ 			if(mc_core_list.ipd_star_flag==1)
+ 			{
+ 				if(Bat_Com_CanRun() && mc_core_list.motor_en &&
+ 				   motor_control_list.bldc_state == MOTOR_POSITION &&
+ 				   user_list.userErr.word == 0 && mc_core_list.MC_error.word == 0 &&
+--- original/USER/user_control.c
++++ USER/user_control.c
+@@ -1,14 +1,15 @@
+ #include "user_control.h"
+ #include "parameter.h"
+ #include "board.h"
+ #include "motor_control.h"
+ #include "drv_adc.h"
+ #include "flash_data_save.h"
++#include "tool_mode.h"
+ #include "Bat_com.h"
+ #include "led.h"
+ 
+ 
+ #include "systick.h"
+ #include "motor_config.h"
+ #include "drv_pwm.h"
+ User_list_Struct user_list;
+@@ -94,16 +95,18 @@
+ /**
+  * @brief  用户参数初始化
+  *        清零错误状态，初始化状态机为停止状态，设置初始方向
+  */
+ void user_para_init(void)
+ {
+ 	user_list.userErr.word=0;
+ 	user_list.user_state=TOOL_STOP;
++	/* 中文：双模式默认值先初始化，随后上电read_user_data恢复已提交设置。 */
++	tool_mode_init();
+ 		user_list.flag.bits.gToolDir= Tool_Dir_Init;
+ 	/* 扳机为上电来源：首次稳定方向确认后允许本次扣动启动。 */
+ 	user_list.direction_initialized=0;
+ 	user_list.dir_valid=0;
+ 	user_list.dir_retrig_need=1;
+ 
+ }
+ #if 0
+@@ -1606,18 +1609,18 @@
+ 		pulse_max_duty=((u32)(PWM_PRIOD_LOAD*0.14f));
+ 	
+ 	}
+ 
+ 
+ }
+ /**
+  * @brief  齿轮/挡位处理
+- *        根据当前挡位对目标占空比进行比例缩放
+- *        挡位0: PWM_DUTY_GEARS1(50%) 挡位1: PWM_DUTY_GEARS2(80%) 挡位2+: PWM_DUTY_GEARS3(100%)
++ *        调速模式将原扳机范围映射到15%～当前挡上限；情景模式采用固定目标
++ *        保留底层pwm_set软启动斜坡、最低占空比和全部电机保护
+  */
+ void user_gears_handle(void)
+ {
+ 	
+ 	#if 0
+ 		u8 res=0;
+ 		static uint8_t pulse_dir=0;
+ 		static uint16_t pulse_cout=0;
+@@ -1695,17 +1698,18 @@
+ 		
+ 	}
+ 	else 
+ 	{
+ 	
+ 		motor_control_list.pwm_duty_aim=(motor_control_list.pwm_duty_aim_per*PWM_DUTY_GEARS3)>>15;
+ 	}
+ 	#else 
+-	motor_control_list.pwm_duty_aim=motor_control_list.pwm_duty_aim_per;
++	/* 中文：调速重映射到本挡上限；情景采用固定目标，保留底层软启动及保护。 */
++	motor_control_list.pwm_duty_aim=tool_mode_duty(motor_control_list.pwm_duty_aim_per);
+ 	#endif
+ }
+ /**
+  * @brief  电动扳手按键处理
+  *        正转时切换挡位(0/1/2)，反转时切换自动停机功能
+  *        根据挡位计算目标占空比，并处理自动停机逻辑（反转电流低于阈值时停机）
+  */
+ void user_WrenchKey_Handler(void)
+@@ -2220,16 +2224,18 @@
+ 				user_list.flag.bits.gToolEn = 0;   /**/
+ //				user_list.ToolState_Cnt = 0;
+ 				user_list.user_state = TOOL_STOP;    
+ 			}
+ 		break;
+ 		
+ 		case TOOL_POWER_DOWN:
+ 			user_list.sleep_cnt=0;
++			/* 中文：EN撤销前再执行同一停机保存门控，未停车或写失败时仍保留pending。 */
++			tool_mode_save_handle();
+ 			GPIO_ResetBits(EN_PORT, EN_PIN);  // 关闭电源使能（进入低功耗）
+ 			if(user_list.flag.bits.gToolTrigger)
+ 			{
+ 				if(machine_error_hold.MC_error_hold.word!=0||machine_error_hold.userErr_hold.word!=0)
+ 				{
+ 					user_list.user_state = TOOL_ERROR_STOP;
+ 				}
+ 				else
+--- original/USER/flash_data_save.c
++++ USER/flash_data_save.c
+@@ -1,199 +1,223 @@
+-#include "flash_data_save.h"
+-#include "user_control.h"
+-#define FLASH_START_ADDRESS     ((uint32_t)0x08000000)
+-#define FLASH_PAGE_SIZE         (1024)
+-#define OffsetAddress         (FLASH_START_ADDRESS + 31 * FLASH_PAGE_SIZE)
+-
+-#define DATA_BLOCK_SIZE      20  //数据块大小(半字数)���ݿ��С
+-#define DATA_BLOCK_NUM      10   //数据块数量（写入次数）���ݿ���� ��д������
+-
+-
+-#define BALANCE_EN  (1)
+-
+-uint16_t save_data_buf[DATA_BLOCK_SIZE];
+-//void write_half_data(uint32_t Address,uint16_t write_data)
+-//{
+-//		uint32_t real_address;
+-//		real_address=OffsetAddress+Address;
+-//    FLASH_Unlock();
+-
+-//    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
+-
+-//    FLASH_ErasePage(real_address);
+-//    FLASH_ClearFlag(FLASH_FLAG_EOP);
+-
+-//    FLASH_ProgramHalfWord(real_address, write_data);
+-//    FLASH_ClearFlag(FLASH_FLAG_EOP);
+-
+-//    FLASH_Lock();
+-//}
+-
+-uint16_t read_half_data(uint32_t Address)
+-{
+-	  return(*(volatile uint16_t *)(Address));
+-}
+-
+-
+-
+-#if(BALANCE_EN)
+-void save_data_to_flash(uint16_t* save_data,uint8_t length )
+-{
+-	uint16_t read_data_temp;
+-//	uint16_t write_data_temp;
+-	uint8_t empty_addr_start=0;
+-	uint8_t i=0;
+-	uint32_t w_ptr;
+-	 for(i=0;i<DATA_BLOCK_NUM;i++)  // 遍历所有数据块寻找空块
+-	{
+-	
+-	    w_ptr = OffsetAddress+DATA_BLOCK_SIZE*i;
+-
+-		  read_data_temp=read_half_data(w_ptr);
+-			if(read_data_temp!=0x55AA)  // 首字不等于0x55AA表示空块
+-			{
+-				empty_addr_start=i*DATA_BLOCK_SIZE;
+-				break;
+-			}		
+-	}
+-	
+-			if(i==DATA_BLOCK_NUM)  // 所有块已满，需要擦除
+-			{
+-			    FLASH_Unlock();
+-
+-					FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
+-
+-					FLASH_ErasePage(OffsetAddress);  // 擦除整页
+-					FLASH_ClearFlag(FLASH_FLAG_EOP);
+-				  empty_addr_start=0;
+-			}
+-			
+-//			write_data_temp=0x55AA;
+-//			FLASH_ProgramHalfWord(empty_addr_start+OffsetAddress, write_data_temp);
+-		 FLASH_Unlock();
+-			for(i=0;i<length;i++)  // 逐半字写入
+-			{
+-				FLASH_ProgramHalfWord(2*i+empty_addr_start+OffsetAddress, save_data[i]);
+-			}
+-		 FLASH_Lock();
+-}
+-
+-
+-uint8_t read_data_for_flash(uint16_t *read_data,uint8_t length)
+-{
+-	uint16_t read_data_temp;
+-	uint8_t empty_addr_start=0;
+-	uint8_t empty_addr_last=0;
+-	uint8_t i=0;
+-	uint8_t ret_sta=0;
+-	 uint32_t w_ptr;
+-	 for(i=0;i<DATA_BLOCK_NUM;i++)
+-	{
+-	
+-	    w_ptr = OffsetAddress+DATA_BLOCK_SIZE*i;
+-
+-		  read_data_temp=read_half_data(w_ptr);
+-			if(read_data_temp!=0x55AA)
+-			{
+-				empty_addr_start=i*DATA_BLOCK_SIZE;
+-				break;
+-			}				
+-	}
+-	
+-			if(i==DATA_BLOCK_NUM)
+-		{
+-			empty_addr_start=i*DATA_BLOCK_SIZE;
+-		}
+-		if(empty_addr_start==0)
+-		{
+-//			*read_data=0;
+-			ret_sta=0;
+-		}
+-		else 
+-		{
+-			empty_addr_last=empty_addr_start-DATA_BLOCK_SIZE;  // 最后一个已写入块
+-			for(i=0;i<length;i++)
+-			{
+-			
+-			read_data[i]=read_half_data(2*i+empty_addr_last+OffsetAddress);
+-			}
+-				
+-			if(read_data[0]==0x55AA)  // 校验首字确认数据有效
+-			{
+-				ret_sta=1;
+-			}
+-			else 
+-			{
+-			ret_sta=0;
+-			
+-			}
+-		}
+-		
+-		return ret_sta;
+-}
+-#else
+-void save_data_to_flash(uint16_t* save_data,uint8_t length )
+-{
+-		uint8_t i=0;
+-		uint32_t real_address;
+-		real_address=OffsetAddress;
+-		FLASH_Unlock();
+-
+-		FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
+-
+-		FLASH_ErasePage(OffsetAddress);
+-		FLASH_ClearFlag(FLASH_FLAG_EOP);
+-		for(i=0;i<length;i++)
+-		{
+-			FLASH_ProgramHalfWord(real_address+2*i, save_data[i]);
+-		}
+-    FLASH_ClearFlag(FLASH_FLAG_EOP);
+-
+-
+-}
+-
+-
+-uint8_t read_data_for_flash(uint16_t *read_data,uint8_t length)
+-{
+-			uint8_t i=0;
+-			for(i=0;i<length;i++)
+-			{
+-				read_data[i]=read_half_data(2*i);
+-			}
+-			return 1;
+-
+-}
+-#endif
+-
+-void save_user_data(void)
+-{
+-	save_data_buf[0]=0x55AA;  // 有效数据标志
+-	save_data_buf[1]=user_list.gears_level;  // 挡位等级
+-	save_data_buf[2]=user_list.flag.bits.gAutoStopEn;  // 自动停机使能
+-	save_data_to_flash(save_data_buf,3);
+-}
+-
+-void read_user_data(void)
+-{
+-
+-	u8 res=0;
+-	res=read_data_for_flash(save_data_buf,3);
+-	if(res==0)
+-	{
+-		save_data_buf[1]=1;  // 默认挡位=1
+-		save_data_buf[2]=0;  // 默认自动停机=0
+-	}
+-		
+-	user_list.gears_level=save_data_buf[1];
+-	if(user_list.gears_level>1)
+-	{
+-		user_list.gears_level=1;
+-	}
+-	
+-//	user_list.gears_ccw_level=save_data_buf[2];
+-	if(save_data_buf[2]>1)
+-	{
+-		save_data_buf[2]=0;
+-	}
+-	user_list.flag.bits.gAutoStopEn=save_data_buf[2];
+-}
+-
++#include "flash_data_save.h"
++#include "user_control.h"
++#include "tool_mode.h"
++
++/* 中文：末两页为事务日志，工程ROM上限必须为30KB，禁止代码落入此区域。 */
++#define FLASH_PAGE0_ADDRESS (0x08007800ul)
++#define FLASH_PAGE1_ADDRESS (0x08007c00ul)
++#define FLASH_PAGE_BYTES    (1024u)
++#define FLASH_SLOT_BYTES    (20u)
++#define FLASH_SLOT_COUNT    (FLASH_PAGE_BYTES/FLASH_SLOT_BYTES)
++#define FLASH_RECORD_WORDS  (8u)
++#define FLASH_RECORD_MAGIC (0xa65au)
++#define FLASH_RECORD_VERSION (1u)
++#define FLASH_LEGACY_MAGIC  (0x55aau)
++#define FLASH_LEGACY_SLOTS  (10u)
++
++/* 中文：新记录8半字：最后提交标志、版本、模式、调速档、情景档、序号低/高、CRC16。 */
++typedef struct
++{
++	uint32_t page;
++	uint32_t sequence;
++	uint16_t record[FLASH_RECORD_WORDS];
++	uint8_t valid;
++	uint8_t legacy;
++	uint8_t legacy_auto_stop;
++} flash_latest_t;
++
++uint16_t read_half_data(uint32_t address)
++{
++	return *(volatile uint16_t *)address;
++}
++
++static uint16_t flash_record_crc(const uint16_t *record)
++{
++	uint16_t crc=0xffffu;
++	uint8_t word;
++	uint8_t byte;
++	uint8_t bit;
++	/* 中文：CRC16-CCITT，按每半字低字节在先覆盖版本至32位序号，标志不参与。 */
++	for(word=1;word<7;word++)
++	{
++		for(byte=0;byte<2;byte++)
++		{
++			crc^=(uint16_t)(((record[word]>>(8u*byte)) & 0xffu)<<8);
++			for(bit=0;bit<8;bit++)
++			{
++				crc=(crc & 0x8000u) ? (uint16_t)((crc<<1)^0x1021u) : (uint16_t)(crc<<1);
++			}
++		}
++	}
++	return crc;
++}
++
++static uint8_t flash_read_record(uint32_t address,uint16_t *record)
++{
++	uint8_t i;
++	if(read_half_data(address)!=FLASH_RECORD_MAGIC) return 0;
++	for(i=0;i<FLASH_RECORD_WORDS;i++) record[i]=read_half_data(address+2u*i);
++	/* 中文：CRC和范围同时检查，损坏/旧格式/未完成记录均不成为最新设置。 */
++	return record[1]==FLASH_RECORD_VERSION && record[2]<=TOOL_MODE_SCENE &&
++		record[3]>=1 && record[3]<=4 && record[4]>=1 && record[4]<=3 &&
++		record[7]==flash_record_crc(record);
++}
++
++static void flash_find_latest(flash_latest_t *latest)
++{
++	uint32_t page;
++	uint32_t address;
++	uint32_t sequence;
++	uint16_t record[FLASH_RECORD_WORDS];
++	uint8_t page_index;
++	uint8_t slot;
++	uint8_t i;
++	latest->valid=0;
++	latest->legacy=0;
++	latest->sequence=0;
++	latest->legacy_auto_stop=0;
++	for(page_index=0;page_index<2;page_index++)
++	{
++		page=(page_index==0) ? FLASH_PAGE0_ADDRESS : FLASH_PAGE1_ADDRESS;
++		for(slot=0;slot<FLASH_SLOT_COUNT;slot++)
++		{
++			address=page+(uint32_t)slot*FLASH_SLOT_BYTES;
++			if(!flash_read_record(address,record)) continue;
++			sequence=(uint32_t)record[5] | ((uint32_t)record[6]<<16);
++			/* 中文：无效槽不截断扫描；32位序号按差值处理自然回绕。 */
++			if(!latest->valid || (int32_t)(sequence-latest->sequence)>0)
++			{
++				latest->valid=1;
++				latest->page=page;
++				latest->sequence=sequence;
++				for(i=0;i<FLASH_RECORD_WORDS;i++) latest->record[i]=record[i];
++			}
++		}
++	}
++	if(latest->valid) return;
++	/* 中文：仅无新日志时读取旧页31首10槽；旧0/1挡位转换为调速1/2，自动停机仍兼容读取。 */
++	for(slot=0;slot<FLASH_LEGACY_SLOTS;slot++)
++	{
++		address=FLASH_PAGE1_ADDRESS+(uint32_t)slot*FLASH_SLOT_BYTES;
++		if(read_half_data(address)==FLASH_LEGACY_MAGIC &&
++		   read_half_data(address+2)<=1 && read_half_data(address+4)<=1)
++		{
++			latest->valid=1;
++			latest->legacy=1;
++			latest->page=FLASH_PAGE1_ADDRESS;
++			latest->record[2]=TOOL_MODE_SPEED;
++			latest->record[3]=read_half_data(address+2)+1u;
++			latest->record[4]=1;
++			latest->legacy_auto_stop=(uint8_t)read_half_data(address+4);
++		}
++	}
++}
++
++static uint32_t flash_find_empty_slot(uint32_t page)
++{
++	uint8_t slot;
++	uint8_t word;
++	uint32_t address;
++	for(slot=0;slot<FLASH_SLOT_COUNT;slot++)
++	{
++		address=page+(uint32_t)slot*FLASH_SLOT_BYTES;
++		/* 中文：整个20字节必须擦净，残缺记录不能再次编程，只跳过不覆盖。 */
++		for(word=0;word<FLASH_SLOT_BYTES/2u;word++)
++		{
++			if(read_half_data(address+2u*word)!=0xffffu) break;
++		}
++		if(word==FLASH_SLOT_BYTES/2u) return address;
++	}
++	return 0;
++}
++
++uint8_t save_user_data_checked(void)
++{
++	flash_latest_t latest;
++	uint16_t record[FLASH_RECORD_WORDS];
++	uint16_t verify[FLASH_RECORD_WORDS];
++	uint32_t page;
++	uint32_t address;
++	uint32_t sequence;
++	uint8_t erase_needed=0;
++	uint8_t i;
++	uint8_t result=0;
++	uint16_t erase_word;
++	/* 中文：拒绝无效RAM配置，失败不清待保存标志。调用者保证前台完全停机。 */
++	if(tool_mode_list.mode>TOOL_MODE_SCENE || tool_mode_list.speed_gear<1 ||
++	   tool_mode_list.speed_gear>4 || tool_mode_list.scene_gear<1 || tool_mode_list.scene_gear>3)
++	{
++		return 0;
++	}
++	flash_find_latest(&latest);
++	page=(latest.valid && !latest.legacy) ? latest.page : FLASH_PAGE0_ADDRESS;
++	address=flash_find_empty_slot(page);
++	if(address==0)
++	{
++		/* 中文：写满后仅擦另一页，最新有效页保留到新记录完整写入且读回成功。 */
++		if(latest.valid && !latest.legacy)
++		{
++			page=(latest.page==FLASH_PAGE0_ADDRESS) ? FLASH_PAGE1_ADDRESS : FLASH_PAGE0_ADDRESS;
++		}
++		erase_needed=1;
++		address=page;
++	}
++	sequence=latest.valid ? latest.sequence+1u : 1u;
++	record[0]=FLASH_RECORD_MAGIC;
++	record[1]=FLASH_RECORD_VERSION;
++	record[2]=tool_mode_list.mode;
++	record[3]=tool_mode_list.speed_gear;
++	record[4]=tool_mode_list.scene_gear;
++	record[5]=(uint16_t)sequence;
++	record[6]=(uint16_t)(sequence>>16);
++	record[7]=flash_record_crc(record);
++	FLASH_Unlock();
++	FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
++	if(erase_needed)
++	{
++		if(FLASH_ErasePage(page)!=FLASH_COMPLETE) goto save_done;
++		/* 中文：擦页成功还须整页读回FFFF，避免残留旧magic使后续半写误成有效记录。 */
++		for(erase_word=0;erase_word<FLASH_PAGE_BYTES/2u;erase_word++)
++		{
++			if(read_half_data(page+2u*erase_word)!=0xffffu) goto save_done;
++		}
++	}
++	/* 中文：先写数据并逐半字读回；最后写magic提交，任何失败都留下可跳过的残缺槽。 */
++	for(i=1;i<FLASH_RECORD_WORDS;i++)
++	{
++		if(FLASH_ProgramHalfWord(address+2u*i,record[i])!=FLASH_COMPLETE ||
++		   read_half_data(address+2u*i)!=record[i]) goto save_done;
++	}
++	if(FLASH_ProgramHalfWord(address,record[0])!=FLASH_COMPLETE) goto save_done;
++	if(!flash_read_record(address,verify)) goto save_done;
++	for(i=0;i<FLASH_RECORD_WORDS;i++)
++	{
++		if(verify[i]!=record[i]) goto save_done;
++	}
++	result=1;
++save_done:
++	FLASH_Lock();
++	return result;
++}
++
++void save_user_data(void)
++{
++	/* 中文：保留旧调用接口，同样经停机门控；失败由待保存标志留待后续重试。 */
++	tool_mode_list.save_pending=1;
++	tool_mode_save_handle();
++}
++
++void read_user_data(void)
++{
++	flash_latest_t latest;
++	/* 中文：空页或全部损坏时采用默认，不在启动期间重写默认设置。 */
++	tool_mode_init();
++	flash_find_latest(&latest);
++	if(latest.valid)
++	{
++		tool_mode_list.mode=(uint8_t)latest.record[2];
++		tool_mode_list.speed_gear=(uint8_t)latest.record[3];
++		tool_mode_list.scene_gear=(uint8_t)latest.record[4];
++	}
++	user_list.gears_level=tool_mode_gear()-1;
++	user_list.flag.bits.gAutoStopEn=latest.legacy_auto_stop;
++}
+--- original/USER/inc/flash_data_save.h
++++ USER/inc/flash_data_save.h
+@@ -3,13 +3,13 @@
+ #include <stdio.h>
+ #include "mm32_device.h"
+ #include "hal_conf.h"
+ 
+ 
+ 
+ //void write_half_data(uint32_t Address,uint16_t write_data);
+ uint16_t read_half_data(uint32_t Address);
+-void save_data_to_flash(uint16_t* save_data,uint8_t length );
+-u8 read_data_for_flash(uint16_t *read_data,uint8_t length);
++/* 中文：两页事务日志保存；返回1仅表示完整提交并读回验证成功。须由前台停机门控调用。 */
++uint8_t save_user_data_checked(void);
+ void save_user_data(void);
+ void read_user_data(void);
+ #endif
+--- original/USER/inc/parameter.h
++++ USER/inc/parameter.h
+@@ -61,17 +61,17 @@
+ #define Wrench_CW_MAX_DUTY             ((u16)(PWM_PRIOD_LOAD*0.96f))
+ 
+ #define USER_ROTATE_ERROR_EN      (1)  //堵转反转保护---电机1默认打开
+ 
+ #define LIMIT_SPEED_EN                 (0)  //限速
+ 
+ 
+ 
+-#define LED_SCAN_EN       (1)  // 新板7灯与方向/按键分时复用
++#define LED_SCAN_EN       (1)  // 飞机板三IO电量灯扫描；TM1650挡位灯在前台刷新
+ #define PWM_DUTY_GEARS1    (u32)(32768 * 0.5f)  
+ #define PWM_DUTY_GEARS2    (u32)(32768 * 0.80f)    
+ #define PWM_DUTY_GEARS3    (u32)(32768 * 1.0f) 
+ #define PWM_DUTY_GEARS4    (u32)(32768 * 1.0f) 
+ //---------------------------------------------------------------------------------------------------------------------------------------------------//
+ //************************************************************************************************************************************************/
+ 
+ 
+@@ -338,18 +338,19 @@
+ //#define VBus_OVP_FiltMS                                         (300)/*unit:ms*/
+ //#define VBus_OVP_FiltMS_COUNT                                   (u16)((float)VBus_OVP_FiltMS*SLOWLOOP_FRE/1000.0f)
+ //	
+ //#define SOC3_MV                     	                        (u32)((18.2)*100)
+ //#define SOC2_MV                     	                        (u32)((17.2)*100)
+ //#define SOC1_MV                     	                        (u32)((16.2)*100)
+ 
+ 	
+-#define MOS_NTC_10K_3435K 0
+-#define MOS_NTC_100K_3950K 1
++/* 飞机板NTC1=10K/B3435、R41=4.7K；保持95℃保护、85℃恢复。 */
++#define MOS_NTC_10K_3435K 1
++#define MOS_NTC_100K_3950K 0
+ #if 	MOS_NTC_10K_3435K
+ 
+ #define RT_60_F 2.965f   //3435K-10k
+ #define RT_65_F 2.537f
+ #define RT_70_F 2.180f
+ #define RT_75_F 1.880f
+ #define RT_80_F 1.628f
+ #define RT_85_F 1.414f
+--- original/USER/tool_mode.c
++++ USER/tool_mode.c
+@@ -0,0 +1,140 @@
++#include "tool_mode.h"
++#include "parameter.h"
++#include "user_control.h"
++#include "motor_control.h"
++#include "flash_data_save.h"
++#include "tm1650.h"
++
++tool_mode_list_t tool_mode_list;
++static uint8_t key_poll_count;
++static uint8_t key_candidate;
++static uint8_t key_stable_count;
++static uint8_t key_press_latched;
++
++void tool_mode_init(void)
++{
++	/* 中文：空Flash默认调速1档；上电默认不写Flash，避免无意义磨损。 */
++	tool_mode_list.mode=TOOL_MODE_SPEED;
++	tool_mode_list.speed_gear=1;
++	tool_mode_list.scene_gear=1;
++	tool_mode_list.save_pending=0;
++	key_poll_count=0;
++	key_candidate=0;
++	key_stable_count=0;
++	key_press_latched=0;
++}
++
++uint8_t tool_mode_gear(void)
++{
++	return (tool_mode_list.mode==TOOL_MODE_SCENE) ?
++		tool_mode_list.scene_gear : tool_mode_list.speed_gear;
++}
++
++void tool_mode_key_event(uint8_t key)
++{
++	/* 中文：切到另一模式只切换；重复按当前模式键才循环升挡。 */
++	if(key==TOOL_MODE_KEY_SPEED)
++	{
++		if(tool_mode_list.mode!=TOOL_MODE_SPEED)
++		{
++			tool_mode_list.mode=TOOL_MODE_SPEED;
++		}
++		else
++		{
++			if(++tool_mode_list.speed_gear>4) tool_mode_list.speed_gear=1;
++		}
++	}
++	else if(key==TOOL_MODE_KEY_SCENE)
++	{
++		if(tool_mode_list.mode!=TOOL_MODE_SCENE)
++		{
++			tool_mode_list.mode=TOOL_MODE_SCENE;
++		}
++		else
++		{
++			if(++tool_mode_list.scene_gear>3) tool_mode_list.scene_gear=1;
++		}
++	}
++	else
++	{
++		return;
++	}
++	/* 中文：旧用户结构保留0起始挡位索引，持久化使用新模块的1起始挡位。 */
++	user_list.gears_level=tool_mode_gear()-1;
++	tool_mode_list.save_pending=1;
++	user_list.sleep_cnt=0;
++}
++
++uint8_t tool_mode_key_handle(void)
++{
++	uint8_t raw;
++	uint8_t sample;
++	if(++key_poll_count<10) return 0;
++	key_poll_count=0;
++	if(!TM1650_ReadKey(&raw))
++	{
++		/* 中文：通信失败不当作释放；丢弃未完成去抖，保留已按住锁定。 */
++		key_stable_count=0;
++		return 1;
++	}
++	if(!(raw & 0x40u)) sample=0;
++	else if(raw==TOOL_MODE_KEY_SPEED || raw==TOOL_MODE_KEY_SCENE) sample=raw;
++	else sample=0xffu;
++	if(sample!=key_candidate)
++	{
++		key_candidate=sample;
++		key_stable_count=1;
++	}
++	else if(key_stable_count<3)
++	{
++		key_stable_count++;
++	}
++	if(key_stable_count>=3)
++	{
++		if(sample==0)
++		{
++			key_press_latched=0;
++		}
++		else if(!key_press_latched)
++		{
++			/* 中文：未知键也锁住本次按压，确认释放前不接受组合/滑动换键。 */
++			key_press_latched=1;
++			tool_mode_key_event(sample);
++		}
++	}
++	return 1;
++}
++
++uint16_t tool_mode_duty(uint16_t trigger_duty)
++{
++	static const uint8_t speed_percent[4]={40,60,80,100};
++	uint16_t minimum=(uint16_t)MIN_TOOL_DUTY;
++	uint16_t maximum;
++	uint8_t gear;
++	if(tool_mode_list.mode==TOOL_MODE_SCENE)
++	{
++		/* 中文：情景扳机仅参与原启动许可，目标与扣动深度无关；斜坡仍由pwm_set执行。 */
++		return (tool_mode_list.scene_gear==1) ?
++			(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*20u)/100u) : (uint16_t)MAX_TOOL_DUTY;
++	}
++	gear=tool_mode_list.speed_gear;
++	if(gear<1 || gear>4) gear=1;
++	maximum=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*speed_percent[gear-1])/100u);
++	if(trigger_duty<=minimum) return minimum;
++	if(trigger_duty>=MAX_TOOL_DUTY) return maximum;
++	/* 中文：原15..100%扳机映射重新线性分配到15..本挡上限，保留轻扣最低15%。 */
++	return (uint16_t)(minimum+((uint32_t)(trigger_duty-minimum)*(maximum-minimum))/
++		((uint16_t)MAX_TOOL_DUTY-minimum));
++}
++
++void tool_mode_save_handle(void)
++{
++	/* 中文：仅前台完全停机且松扳机时写Flash；制动/启动/运行期间只保留待保存标志。 */
++	if(!tool_mode_list.save_pending || user_list.flag.bits.gToolTrigger ||
++	   user_list.flag.bits.gToolEn || mc_core_list.motor_en ||
++	   motor_control_list.bldc_state!=MOTOR_STOP)
++	{
++		return;
++	}
++	if(save_user_data_checked()) tool_mode_list.save_pending=0;
++}
+--- original/USER/inc/tool_mode.h
++++ USER/inc/tool_mode.h
+@@ -0,0 +1,29 @@
++#ifndef __TOOL_MODE_H
++#define __TOOL_MODE_H
++
++#include <stdint.h>
++
++/* 中文：调速与情景独立保存挡位，挡位均从1开始。 */
++#define TOOL_MODE_SPEED  (0u)
++#define TOOL_MODE_SCENE  (1u)
++#define TOOL_MODE_KEY_SPEED (0x47u)
++#define TOOL_MODE_KEY_SCENE (0x46u)
++
++typedef struct
++{
++	uint8_t mode;
++	uint8_t speed_gear;
++	uint8_t scene_gear;
++	uint8_t save_pending;
++} tool_mode_list_t;
++
++extern tool_mode_list_t tool_mode_list;
++void tool_mode_init(void);
++/* 中文：每1ms调用；返回1表示本次已占用一次TM1650读事务（包括失败）。 */
++uint8_t tool_mode_key_handle(void);
++void tool_mode_key_event(uint8_t key);
++uint16_t tool_mode_duty(uint16_t trigger_duty);
++uint8_t tool_mode_gear(void);
++void tool_mode_save_handle(void);
++
++#endif
+--- original/TM1650/tm1650.c
++++ TM1650/tm1650.c
+@@ -11,30 +11,32 @@
+ #include "systick.h"
+ 
+ /*-------------------------------------------------------------------------------------
+     电平操作
+ -------------------------------------------------------------------------------------*/
+ #define TM1650_SCL_HIGH()       (TM1650_SCL_PORT->BSRR = TM1650_SCL_PIN)
+ #define TM1650_SCL_LOW()        (TM1650_SCL_PORT->BRR  = TM1650_SCL_PIN)
+ 
+-// SDA 配置为开漏输出, 写 1 = 释放总线(靠外部 10K 上拉), 写 0 = 拉低
++// SDA 配置为开漏输出, 写 1 = 释放总线(靠外部 4.7K 上拉), 写 0 = 拉低
+ #define TM1650_SDA_HIGH()       (TM1650_SDA_PORT->BSRR = TM1650_SDA_PIN)
+ #define TM1650_SDA_LOW()        (TM1650_SDA_PORT->BRR  = TM1650_SDA_PIN)
+ #define TM1650_SDA_READ()       ((TM1650_SDA_PORT->IDR & TM1650_SDA_PIN) ? 1U : 0U)
+ 
+ // 时基
+ #define TM1650_DELAY()          systick_delay_us(TM1650_HALF_CYCLE_US)
+ 
+ /*-------------------------------------------------------------------------------------
+     显存影子 + 脏标志
+ -------------------------------------------------------------------------------------*/
+ static uint8_t tm1650_shadow[TM1650_DIG_NUM];   // 当前要显示的内容
+ static uint8_t tm1650_dirty;                    // bit0~bit3 对应 DIG1~DIG4 待刷新
+ static uint8_t tm1650_step;                     // FlushStep 的轮询位置
++static uint8_t tm1650_cfg_shadow;               // 最新系统配置，重试和强制刷新时保留
++static uint8_t tm1650_cfg_dirty;                // 系统配置无 ACK 时保持待重试
+ 
+ /**=====================================================================================
+  * @brief  毫秒延时, 仅上电复位等待使用
+  * @param  n_ms 毫秒数
+  * @return 无
+  =======================================================================================*/
+ static void TM1650_Delay_ms(uint16_t n_ms)
+ {
+@@ -115,19 +117,20 @@
+ 
+     // 第 9 个时钟: 释放总线, 由芯片拉低 DIO 表示应答
+     TM1650_SCL_LOW();
+     TM1650_DELAY();
+ 
+     TM1650_SDA_HIGH();
+     TM1650_DELAY();
+ 
+-    TM1650_SCL_HIGH();
+-    TM1650_DELAY();
++    // 按规格书在第 9 个上升沿之前读 ACK，芯片在该上升沿后释放 SDA。
+     ack = (TM1650_SDA_READ() == 0U) ? 1U : 0U;
++    TM1650_SCL_HIGH();
++    TM1650_DELAY();
+     TM1650_DELAY();
+ 
+     TM1650_SCL_LOW();
+     TM1650_DELAY();
+ 
+     return ack;
+ }
+ 
+@@ -137,18 +140,22 @@
+  * @param  dat  数据字节
+  * @return 1 = 两个字节都收到 ACK, 0 = 有一个无应答
+  =======================================================================================*/
+ static uint8_t TM1650_Transfer(uint8_t cmd, uint8_t dat)
+ {
+     uint8_t ack;
+ 
+     TM1650_Start();
+-    ack  = TM1650_WriteByte(cmd);
+-    ack &= TM1650_WriteByte(dat);
++    ack = TM1650_WriteByte(cmd);
++    // 命令未应答时立即 STOP，下一次前台服务再重试整个事务。
++    if (ack)
++    {
++        ack = TM1650_WriteByte(dat);
++    }
+     TM1650_Stop();
+ 
+     return ack;
+ }
+ 
+ /**=====================================================================================
+  * @brief  SCL / SDA 引脚初始化, SCL 推挽输出, SDA 开漏输出
+  * @param  无
+@@ -195,37 +202,100 @@
+ 
+     TM1650_Gpio_Init();
+ 
+     // 等芯片内部上电复位结束
+ #if (TM1650_POR_WAIT_MS > 0)
+     TM1650_Delay_ms(TM1650_POR_WAIT_MS);
+ #endif
+ 
+-    // 先清显存
++    // 上电写零必须收到 ACK 才清脏；芯片尚未就绪时由前台单步重试。
++    tm1650_dirty = (uint8_t)((1U << TM1650_DIG_NUM) - 1U);
++    tm1650_step  = 0;
+     for (i = 0; i < TM1650_DIG_NUM; i++)
+     {
+         tm1650_shadow[i] = 0x00;
+-        TM1650_Transfer((uint8_t)(TM1650_ADDR_BASE + (i << 1)), 0x00);
+-    }
+-    tm1650_dirty = 0x00;
+-    tm1650_step  = 0;
++        if (TM1650_Transfer((uint8_t)(TM1650_ADDR_BASE + (i << 1)), 0x00))
++        {
++            tm1650_dirty &= (uint8_t)(~(1U << i));
++        }
++    }
+ 
+     // 再开显示
+     TM1650_SetDisplay(TM1650_CFG_ON);
+ }
+ 
+ /**=====================================================================================
+  * @brief  写系统参数, 设置亮度 / 段模式 / 工作模式 / 开关屏
+  * @param  cfg 由 TM1650_BRIGHT_x | TM1650_SEG_MODE_x | TM1650_MODE_x | TM1650_DISP_x 组合
+  * @return 1 = 收到 ACK, 0 = 无应答
+  =======================================================================================*/
+ uint8_t TM1650_SetDisplay(uint8_t cfg)
+ {
+-    return TM1650_Transfer(TM1650_CMD_SYS, cfg);
++    uint8_t ack;
++
++    // 最新配置覆盖旧请求；只有完整事务 ACK 才取消待重试标志。
++    tm1650_cfg_shadow = cfg;
++    tm1650_cfg_dirty = 1U;
++    ack = TM1650_Transfer(TM1650_CMD_SYS, cfg);
++    if (ack)
++    {
++        tm1650_cfg_dirty = 0U;
++    }
++    return ack;
++}
++
++/**=====================================================================================
++ * @brief  前台读取键盘原始扫描码，高位先读，末字节 NACK 后 STOP
++ * @param  key 成功时写入原始键码；无 ACK 或空指针时保持原值
++ * @return 1 = 命令收到 ACK 且已读取，0 = 失败
++ * @note   只能在前台调用；不关闭电机中断，业务去抖由上层处理
++ =======================================================================================*/
++uint8_t TM1650_ReadKey(uint8_t *key)
++{
++    uint8_t i;
++    uint8_t dat = 0U;
++
++    if (key == 0)
++    {
++        return 0U;
++    }
++
++    TM1650_Start();
++    if (!TM1650_WriteByte(TM1650_CMD_READKEY))
++    {
++        TM1650_Stop();
++        return 0U;
++    }
++
++    // SDA 保持开漏释放，芯片在 SCL 下降沿输出下一位数据。
++    TM1650_SDA_HIGH();
++    for (i = 0; i < 8U; i++)
++    {
++        TM1650_SCL_LOW();
++        TM1650_DELAY();
++        TM1650_SCL_HIGH();
++        TM1650_DELAY();
++        dat = (uint8_t)((dat << 1) | TM1650_SDA_READ());
++        TM1650_DELAY();
++        TM1650_SCL_LOW();
++        TM1650_DELAY();
++    }
++
++    // 只读取一个键码，末字节第 9 位保持 SDA 高，发送 NACK 后结束。
++    TM1650_SDA_HIGH();
++    TM1650_DELAY();
++    TM1650_SCL_HIGH();
++    TM1650_DELAY();
++    TM1650_SCL_LOW();
++    TM1650_DELAY();
++    TM1650_Stop();
++
++    *key = dat;
++    return 1U;
+ }
+ 
+ /**=====================================================================================
+  * @brief  改写显存影子里的一个位, 只置脏标志, 不立即上总线
+  * @param  dig 位地址序号 0~3, 对应 DIG1~DIG4
+  * @param  bit 段序号 0~7, 对应 A B C D E F G DP
+  * @param  on  1 = 点亮, 0 = 熄灭
+  * @return 无
+@@ -318,66 +388,79 @@
+ void TM1650_Flush(void)
+ {
+     uint8_t i;
+ 
+     for (i = 0; i < TM1650_DIG_NUM; i++)
+     {
+         if (tm1650_dirty & (1U << i))
+         {
+-            TM1650_Transfer((uint8_t)(TM1650_ADDR_BASE + (i << 1)), tm1650_shadow[i]);
+-            tm1650_dirty &= (uint8_t)(~(1U << i));
+-        }
++            // 无 ACK 时保留该位，下一次 Flush/FlushStep 重新发送。
++            if (TM1650_Transfer((uint8_t)(TM1650_ADDR_BASE + (i << 1)), tm1650_shadow[i]))
++            {
++                tm1650_dirty &= (uint8_t)(~(1U << i));
++            }
++        }
++    }
++    // 批量接口也处理此前失败的系统配置；运行中应使用单步接口。
++    if (tm1650_cfg_dirty)
++    {
++        TM1650_SetDisplay(tm1650_cfg_shadow);
+     }
+ }
+ 
+ /**=====================================================================================
+  * @brief  每次最多只写一个位, 把刷新耗时摊开, 建议放在 1ms 任务里周期调用
+  * @param  无
+- * @return 1 = 本次写了一个位, 0 = 没有需要刷新的内容
++ * @return 1 = 本次事务 ACK 成功, 0 = 事务失败或无待刷新内容
+  * @note   单次耗时约 380us, 芯片内置锁存器, 没有变化时总线上不会有任何波形
+  =======================================================================================*/
+ uint8_t TM1650_FlushStep(void)
+ {
+     uint8_t i;
++
++    // 配置重试也是一个完整事务，本次不再发送显存以限制前台阻塞。
++    if (tm1650_cfg_dirty)
++    {
++        return TM1650_SetDisplay(tm1650_cfg_shadow);
++    }
+ 
+     if (tm1650_dirty == 0x00)
+     {
+         return 0;
+     }
+ 
+     // 从上次的位置往下找, 保证 4 个位轮流得到刷新机会
+     for (i = 0; i < TM1650_DIG_NUM; i++)
+     {
+         if (++tm1650_step >= TM1650_DIG_NUM)
+         {
+             tm1650_step = 0;
+         }
+ 
+         if (tm1650_dirty & (1U << tm1650_step))
+         {
+-            TM1650_Transfer((uint8_t)(TM1650_ADDR_BASE + (tm1650_step << 1)), tm1650_shadow[tm1650_step]);
+-            tm1650_dirty &= (uint8_t)(~(1U << tm1650_step));
+-            return 1;
++            // 失败仍然占用本次服务，保留脏标志，不能继续尝试第二个事务。
++            if (TM1650_Transfer((uint8_t)(TM1650_ADDR_BASE + (tm1650_step << 1)), tm1650_shadow[tm1650_step]))
++            {
++                tm1650_dirty &= (uint8_t)(~(1U << tm1650_step));
++                return 1U;
++            }
++            return 0U;
+         }
+     }
+ 
+     return 0;
+ }
+ 
+ /**=====================================================================================
+  * @brief  强制重写全部显存和系统参数, 用于定期纠正受干扰后的错误状态
+  * @param  无
+  * @return 无
+- * @note   电机工作时干扰大, 建议 1 秒左右调用一次
++ * @note   仅用于非运行时前台；运行中通过单步接口刷新，禁止在中断调用
+  =======================================================================================*/
+ void TM1650_Refresh(void)
+ {
+-    uint8_t i;
+-
+-    for (i = 0; i < TM1650_DIG_NUM; i++)
+-    {
+-        TM1650_Transfer((uint8_t)(TM1650_ADDR_BASE + (i << 1)), tm1650_shadow[i]);
+-    }
+-    tm1650_dirty = 0x00;
+-
+-    TM1650_SetDisplay(TM1650_CFG_ON);
+-}
++    // 重写最新影子及系统配置，避免刷新把休眠状态或亮度恢复成默认值。
++    tm1650_dirty = (uint8_t)((1U << TM1650_DIG_NUM) - 1U);
++    tm1650_cfg_dirty = 1U;
++    TM1650_Flush();
++}
+--- original/TM1650/tm1650.h
++++ TM1650/tm1650.h
+@@ -8,22 +8,23 @@
+ #include "hal_conf.h"
+ 
+ /*-------------------------------------------------------------------------------------
+     引脚定义
+ -------------------------------------------------------------------------------------*/
+ #define TM1650_GPIO_CLK             (RCC_AHBENR_GPIOA_Msk)
+ 
+ #define TM1650_SCL_PORT             GPIOA
+-#define TM1650_SCL_PIN              GPIO_Pin_11
+-#define TM1650_SCL_PIN_SRC          GPIO_PinSource11
++// 新板原理图：SCL=PA12，SDA=PA11，SDA 使用外部 4.7K 上拉。
++#define TM1650_SCL_PIN              GPIO_Pin_12
++#define TM1650_SCL_PIN_SRC          GPIO_PinSource12
+ 
+ #define TM1650_SDA_PORT             GPIOA
+-#define TM1650_SDA_PIN              GPIO_Pin_12
+-#define TM1650_SDA_PIN_SRC          GPIO_PinSource12
++#define TM1650_SDA_PIN              GPIO_Pin_11
++#define TM1650_SDA_PIN_SRC          GPIO_PinSource11
+ 
+ #define TM1650_PIN_AF_GPIO          GPIO_AF_0
+ 
+ /*-------------------------------------------------------------------------------------
+     时序参数
+ -------------------------------------------------------------------------------------*/
+ #define TM1650_HALF_CYCLE_US        (3)     // 时基
+ #define TM1650_POR_WAIT_MS          (60)    // 复位时间
+@@ -76,19 +77,22 @@
+ #define TM1650_CFG_ON               (TM1650_BRIGHT_8 | TM1650_SEG_MODE_8 | TM1650_MODE_NORMAL | TM1650_DISP_ON)
+ #define TM1650_CFG_OFF              (TM1650_BRIGHT_8 | TM1650_SEG_MODE_8 | TM1650_MODE_NORMAL | TM1650_DISP_OFF)
+ 
+ /*-------------------------------------------------------------------------------------
+     接口
+ -------------------------------------------------------------------------------------*/
+ void    TM1650_Init(void);
+ uint8_t TM1650_SetDisplay(uint8_t cfg);
++/* 前台读取原始键码：成功返回1，命令无ACK返回0且不改写输出。 */
++uint8_t TM1650_ReadKey(uint8_t *key);
+ 
+ void    TM1650_SetBit(uint8_t dig, uint8_t bit, uint8_t on);
+ void    TM1650_SetDigit(uint8_t dig, uint8_t dat);
+ uint8_t TM1650_GetDigit(uint8_t dig);
+ void    TM1650_Clear(void);
+ 
+ void    TM1650_Flush(void);
++/* 每次最多一个事务；返回1=ACK成功，0=失败或无待刷新内容。 */
+ uint8_t TM1650_FlushStep(void);
+ void    TM1650_Refresh(void);
+ 
+ #endif
+--- original/KEIL_PRJ/MM32SPIN0230_Demo.uvprojx
++++ KEIL_PRJ/MM32SPIN0230_Demo.uvprojx
+@@ -13,17 +13,17 @@
+       <pCCUsed>6220000::V6.22::ARMCLANG</pCCUsed>
+       <uAC6>1</uAC6>
+       <TargetOption>
+         <TargetCommonOption>
+           <Device>MM32SPIN0230B1NV</Device>
+           <Vendor>MindMotion</Vendor>
+           <PackID>MindMotion.MM32SPIN0230_DFP.1.1.2</PackID>
+           <PackURL>https://www.mindmotion.com.cn/support/software/keil_pack/</PackURL>
+-          <Cpu>IRAM(0x20000000,0x1000) IROM(0x08000000,0x8000) CPUTYPE("Cortex-M0") CLOCK(12000000) ELITTLE</Cpu>
++          <Cpu>IRAM(0x20000000,0x1000) IROM(0x08000000,0x7800) CPUTYPE("Cortex-M0") CLOCK(12000000) ELITTLE</Cpu>
+           <FlashUtilSpec></FlashUtilSpec>
+           <StartupFile></StartupFile>
+           <FlashDriverDll>UL2CM3(-S0 -C0 -P0 -FD20000000 -FC1000 -FN2 -FF0MM32SPIN0230_32 -FS08000000 -FL08000 -FF1MM32SPIN0230_3 -FS11FE00000 -FL1C00 -FP0($$Device:MM32SPIN0230B1NV$Flash\MM32SPIN0230_32.FLM) -FP1($$Device:MM32SPIN0230B1NV$Flash\MM32SPIN0230_3.FLM))</FlashDriverDll>
+           <DeviceId>0</DeviceId>
+           <RegisterFile></RegisterFile>
+           <MemoryEnv></MemoryEnv>
+           <Cmp></Cmp>
+           <Asm></Asm>
+@@ -247,17 +247,17 @@
+               <IRAM>
+                 <Type>0</Type>
+                 <StartAddress>0x20000000</StartAddress>
+                 <Size>0x1000</Size>
+               </IRAM>
+               <IROM>
+                 <Type>1</Type>
+                 <StartAddress>0x8000000</StartAddress>
+-                <Size>0x8000</Size>
++                <Size>0x7800</Size>
+               </IROM>
+               <XRAM>
+                 <Type>0</Type>
+                 <StartAddress>0x0</StartAddress>
+                 <Size>0x0</Size>
+               </XRAM>
+               <OCR_RVCT1>
+                 <Type>1</Type>
+@@ -272,17 +272,17 @@
+               <OCR_RVCT3>
+                 <Type>1</Type>
+                 <StartAddress>0x0</StartAddress>
+                 <Size>0x0</Size>
+               </OCR_RVCT3>
+               <OCR_RVCT4>
+                 <Type>1</Type>
+                 <StartAddress>0x8000000</StartAddress>
+-                <Size>0x8000</Size>
++                <Size>0x7800</Size>
+               </OCR_RVCT4>
+               <OCR_RVCT5>
+                 <Type>1</Type>
+                 <StartAddress>0x0</StartAddress>
+                 <Size>0x0</Size>
+               </OCR_RVCT5>
+               <OCR_RVCT6>
+                 <Type>0</Type>
+@@ -335,17 +335,17 @@
+             <vShortWch>1</vShortWch>
+             <v6Lto>0</v6Lto>
+             <v6WtE>0</v6WtE>
+             <v6Rtti>0</v6Rtti>
+             <VariousControls>
+               <MiscControls></MiscControls>
+               <Define>USE_STDPERIPH_DRIVER,USE_5V</Define>
+               <Undefine></Undefine>
+-              <IncludePath>..\MM32SPIN0230\Include;..\MM32SPIN0230\HAL_Lib\inc;..\DRIVE\inc;..\SYSTEM\inc;..\USER\inc;..\M1_CONTROL\inc;..\MM_MCLIB\inc;..\MM_MCLIB\inc;..\MY_MC;..\MOTOR_CONTROL;..\MC_CORE</IncludePath>
++              <IncludePath>..\MM32SPIN0230\Include;..\MM32SPIN0230\HAL_Lib\inc;..\DRIVE\inc;..\SYSTEM\inc;..\USER\inc;..\M1_CONTROL\inc;..\MM_MCLIB\inc;..\MM_MCLIB\inc;..\MY_MC;..\MOTOR_CONTROL;..\MC_CORE;..\TM1650</IncludePath>
+             </VariousControls>
+           </Cads>
+           <Aads>
+             <interw>1</interw>
+             <Ropi>0</Ropi>
+             <Rwpi>0</Rwpi>
+             <thumb>0</thumb>
+             <SplitLS>0</SplitLS>
+@@ -415,16 +415,27 @@
+               <FilePath>..\USER\led.c</FilePath>
+             </File>
+             <File>
+               <FileName>flash_data_save.c</FileName>
+               <FileType>1</FileType>
+               <FilePath>..\USER\flash_data_save.c</FilePath>
+             </File>
+             <File>
++              <FileName>tool_mode.c</FileName>
++              <FileType>1</FileType>
++              <FilePath>..\USER\tool_mode.c</FilePath>
++            </File>
++            <!-- 飞机板：TM1650和双模式控制；末尾两页Flash专用掉电存储。 -->
++            <File>
++              <FileName>tm1650.c</FileName>
++              <FileType>1</FileType>
++              <FilePath>..\TM1650\tm1650.c</FilePath>
++            </File>
++            <File>
+               <FileName>Bat_com.c</FileName>
+               <FileType>1</FileType>
+               <FilePath>..\USER\Bat_com.c</FilePath>
+             </File>
+           </Files>
+         </Group>
+         <Group>
+           <GroupName>SYSTEM</GroupName>

@@ -40,100 +40,75 @@ static void test_alarm_mapping(void)
 static void test_matrix_and_sampling(void)
 {
 	unsigned led, slot;
-	const uint16_t column_a[] = {0x2000, 1, 0x400, 0x2000, 1, 0x400, 0};
-	for(led=1; led<=7; led++)
+	/* 新图实际二极管方向：LED1 L1->L2，LED2 L1->L3，LED3 L3->L1。 */
+	for(led=1; led<=3; led++)
 	{
 		GPIOA->CRL=0x77777770;
-		GPIO_SetBits(GPIOA, GPIO_Pin_11);
+		GPIOA->CRH=0x44444444;
+		GPIOB->CRH=0x44444444;
+		GPIOA->ODR=0x1800; /* SDA/SCL电平由驱动独占，扫描不得改写。 */
+		GPIOB->ODR=0x200;  /* EN=PB9必须持续保持。 */
 		led_init();
-		CHECK((GPIOA->CRL & 0xfffffff0)==0x77777770); /* PWM/ADC邻脚未改 */
-		CHECK(GPIOA->ODR & GPIO_Pin_11); /* EN保持高 */
+		CHECK((GPIOA->CRL & 0xfffffff0)==0x77777770);
+		CHECK((GPIOA->ODR & 0x1800)==0x1800);
+		CHECK(GPIOB->ODR & 0x200);
 		user_list.user_state=TOOL_STOP;
 		user_list.led_scan_start_flag=1;
 		ledData.Word=1u<<led;
-		GPIOA->IDR=0xffff;
-		GPIOB->IDR=0xffff;
-		for(slot=1; slot<=13; slot++)
+		for(slot=1; slot<=3; slot++)
 		{
-			if(slot==13) { GPIOA->IDR=0; GPIOB->IDR=0; }
+			GPIOA->IDR=(slot==2 ? 0 : 0x2001);
 			LED_Scan();
-			CHECK(GPIOA->ODR & GPIO_Pin_11);
-			if(slot<=7)
+			CHECK((GPIOA->ODR & 0x1800)==0x1800 && (GPIOB->ODR & 0x200));
+			CHECK(user_list.led_input_valid);
+			CHECK(user_list.Dir_Data==(slot==2 ? 0 : 1));
+			CHECK(user_list.Key_Data==(slot==2 ? 0 : 1));
+			CHECK(((GPIOA->CRH>>20)&0xf)==8); /* DIR为独立上拉输入。 */
+			CHECK((GPIOA->CRL&0xf)==8); /* K1为独立上拉输入。 */
+			if(slot==led)
 			{
-				uint32_t mode_b=GPIOB->CRH & 0xf;
-				uint32_t mode_a=(GPIOA->CRH>>24) & 0xf;
-				if(slot==led)
-				{
-					CHECK(mode_b==((led>=4 && led<=6) ? 1 : 0));
-					CHECK(mode_a==((led<=3 || led==7) ? 1 : 0));
-					CHECK((GPIOA->ODR & 0x2401)==(0x2401 & ~column_a[led-1]));
-					CHECK((GPIOB->ODR & 0x200)==(led==7 ? 0 : 0x200));
-				}
-				else
-				{
-					CHECK(mode_a==0 && mode_b==0);
-					CHECK((GPIOA->ODR & 0x2401)==0x2401 && (GPIOB->ODR & 0x200));
-				}
-			}
-			else if(slot<=11)
-			{
-				/* 参考4槽全高阻：PA13/SWDIO也必须停止驱动。 */
-				CHECK((GPIOA->CRH & (GPIO_CRH_MODE13 | GPIO_CRH_CNF13 |
-					GPIO_CRH_MODE14 | GPIO_CRH_CNF14 | GPIO_CRH_MODE10 | GPIO_CRH_CNF10))==0);
-				CHECK((GPIOA->CRL & 0xf)==0 && (GPIOB->CRH & 0xff)==0);
-			}
-			else if(slot==12)
-			{
-				CHECK((GPIOB->CRH & 0xf)==8 && ((GPIOA->CRH>>24) & 0xf)==8);
-				CHECK(((GPIOA->CRH>>20) & 0xf)==1 && ((GPIOA->CRH>>8) & 0xf)==1);
-				CHECK((GPIOA->CRL & 0xf)==1 && ((GPIOB->CRH>>4) & 0xf)==1);
-				CHECK((GPIOA->ODR & 0x2401)==0x2401 && (GPIOB->ODR & 0x200));
+				CHECK(((GPIOA->CRH>>24)&0xf)==1); /* L1=PA14 */
+				CHECK(((GPIOA->CRH>>8)&0xf)==(led==1 ? 1 : 0)); /* L2=PA10 */
+				CHECK((GPIOB->CRH&0xf)==(led==1 ? 0 : 1)); /* L3=PB8 */
+				CHECK(!!(GPIOA->ODR&0x4000)==(led==3 ? 0 : 1));
+				if(led==1) CHECK(!(GPIOA->ODR&0x400));
+				else CHECK(!!(GPIOB->ODR&0x100)==(led==3 ? 1 : 0));
 			}
 			else
 			{
-				/* 采样完按参考把两行改回推挽低电平，随后开始下一轮。 */
-				CHECK((GPIOB->CRH & 0xf)==1 && ((GPIOA->CRH>>24) & 0xf)==1);
-				CHECK(!(GPIOB->ODR & LED_ROW1_PIN) && !(GPIOA->ODR & LED_ROW2_PIN));
+				CHECK(((GPIOA->CRH>>24)&0xf)==0);
+				CHECK(((GPIOA->CRH>>8)&0xf)==0 && (GPIOB->CRH&0xf)==0);
 			}
-			if(slot<13) CHECK(!user_list.led_input_valid && user_list.Dir_Data==1 && user_list.Key_Data==1);
 		}
-		CHECK(user_list.led_input_valid && !user_list.Dir_Data && !user_list.Key_Data);
 	}
-	/* 禁止扫描/休眠时不驱动灯，仍可在休眠时采样输入。 */
+	user_list.user_state=TOOL_POWER_DOWN;
+	ledData.Word=0xfe;
+	LED_Scan();
+	CHECK(((GPIOA->CRH>>24)&0xf)==0 && ((GPIOA->CRH>>8)&0xf)==0 && (GPIOB->CRH&0xf)==0);
+	CHECK((GPIOA->ODR&0x1800)==0x1800 && (GPIOB->ODR&0x200));
 	user_list.led_scan_start_flag=0;
 	LED_Scan();
 	CHECK(!user_list.led_input_valid);
-	user_list.led_scan_start_flag=1;
-	user_list.user_state=TOOL_POWER_DOWN;
-	ledData.Word=0xfe;
-	for(slot=0; slot<13; slot++)
-	{
-		LED_Scan();
-		CHECK(!(GPIOA->CRH & GPIO_CRH_MODE14) && !(GPIOB->CRH & GPIO_CRH_MODE8));
-	}
-	CHECK(user_list.led_input_valid);
 }
 
 static void test_swd_startup_not_remapped_early(void)
 {
 	uint32_t mode_a, mode_b;
 	memset(&user_list, 0, sizeof(user_list));
-	/* vendor GPIO_AFIODeInit: PA13/PA14的复位复用为AF0/SWD。 */
 	GPIOA->AFRH=0xf00fffff;
 	GPIOA->CRH=0x44444444;
 	GPIOB->CRH=0x44444444;
-	Bsp_Gpio_Init(); /* PWM/ADC等无关外设由测试桩隔离，共享输入函数是真实GPIO代码。 */
+	Bsp_Gpio_Init(); /* 校准前不接管PA13/14，保留原有烧录连接窗口。 */
 	CHECK((GPIOA->AFRH & 0x0ff00000)==0);
-	CHECK(((GPIOA->CRH>>20) & 0xff)==0x44);
+	CHECK(((GPIOA->CRH>>20)&0xff)==0x44);
 	mode_a=GPIOA->CRH;
 	mode_b=GPIOB->CRH;
-	LED_Scan(); /* 参考未启动扫描直接返回，不能提前驱动烧录口。 */
+	LED_Scan();
 	CHECK(GPIOA->CRH==mode_a && GPIOB->CRH==mode_b);
-	CHECK((GPIOA->AFRH & 0x0ff00000)==0);
-	led_init(); /* 在main原有100ms校准窗口之后才调用。 */
+	led_init();
 	CHECK((GPIOA->AFRH & 0x0ff00000)==0x01100000);
-	CHECK(((GPIOA->CRH>>20) & 0xff)==0x44); /* 参考初始化为浮空，不提前推挽。 */
-	CHECK((GPIOB->CRH & 0xff)==0x44);
+	CHECK(((GPIOA->CRH>>20)&0xff)==0x08); /* PA13上拉、PA14模拟高阻。 */
+	CHECK((GPIOB->CRH&0xf)==0);
 }
 
 static void test_direction_and_key(void)
@@ -218,7 +193,8 @@ static void test_soc_immediate_run(void)
 	UO_Led_Handler();
 	CHECK((ledData.Word & 0x0e)==0x0e); /* 未经过停机等待，首次运行也应亮三灯 */
 	LED_Scan();
-	CHECK(((GPIOA->CRH>>24) & 0xf)==1 && !(GPIOA->ODR & GPIO_Pin_13));
+	CHECK(((GPIOA->CRH>>24) & 0xf)==1 && !(GPIOA->ODR & GPIO_Pin_10));
+	CHECK(GPIOA->ODR & GPIO_Pin_13); /* 独立方向上拉不被电量灯扫描拉低。 */
 	/* 保留负载压降期间电量灯稳定，避免简单删除运行状态门控。 */
 	user_list.VBus_Vx100=1500;
 	for(i=0;i<1000;i++)
@@ -267,6 +243,7 @@ static void reset_light_fixture(void)
 	memset(&motor_control_list, 0, sizeof(motor_control_list));
 	memset(&user_led_control, 0, sizeof(user_led_control));
 	led_init();
+	tool_mode_init();
 	GPIO_SetBits(EN_PORT, EN_PIN);
 	user_list.led_scan_start_flag=1;
 	user_list.dir_valid=1;
@@ -288,12 +265,12 @@ static void test_release_sleep_and_repress(void)
 	unsigned i;
 	reset_light_fixture();
 	run_light_tick();
-	CHECK(GPIOA->ODR & LED_LIGHT_PIN);
+	CHECK(TM1650_GetDigit(0)==0x40);
 	CHECK((ledData.Word & 0x0e)!=0);
 	user_list.flag.bits.gToolTrigger=0;
 	run_light_tick(); /* RUN -> STOP，下一次1ms任务开始休眠计数。 */
 	for(i=0;i<1000;i++) run_light_tick();
-	CHECK(user_list.user_state==TOOL_STOP && (GPIOA->ODR & LED_LIGHT_PIN));
+	CHECK(user_list.user_state==TOOL_STOP && (TM1650_GetDigit(0)==0x40));
 	user_list.flag.bits.gToolTrigger=1;
 	run_light_tick();
 	CHECK(user_list.user_state==TOOL_RUN && user_list.sleep_cnt==0);
@@ -303,21 +280,21 @@ static void test_release_sleep_and_repress(void)
 	{
 		run_light_tick();
 		CHECK(user_list.user_state==TOOL_STOP);
-		CHECK((GPIOA->ODR & LED_LIGHT_PIN) && (ledData.Word & 0x0e));
+		CHECK((TM1650_GetDigit(0)==0x40) && (ledData.Word & 0x0e));
 	}
 	CHECK(user_list.sleep_cnt==5000);
 	run_light_tick();
 	CHECK(user_list.user_state==TOOL_POWER_DOWN); /* 与参考一致：计数>5000 */
-	CHECK(!(GPIOA->ODR & LED_LIGHT_PIN) && ledData.Word==0);
+	CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0 && ledData.Word==0);
 	CHECK(!user_list.flag.bits.gToolEn);
 	run_light_tick();
-	CHECK(!(GPIOA->ODR & EN_PIN));
+	CHECK(!(EN_PORT->ODR & EN_PIN));
 	for(i=0;i<9;i++) LED_Scan();
 	CHECK(!(GPIOA->CRH & GPIO_CRH_MODE14) && !(GPIOB->CRH & GPIO_CRH_MODE8));
 	user_list.flag.bits.gToolTrigger=1;
 	run_light_tick();
-	CHECK(user_list.user_state==TOOL_STOP && (GPIOA->ODR & EN_PIN));
-	CHECK((GPIOA->ODR & LED_LIGHT_PIN) && (ledData.Word & 0x0e));
+	CHECK(user_list.user_state==TOOL_STOP && (EN_PORT->ODR & EN_PIN));
+	CHECK((TM1650_GetDigit(0)==0x40) && (ledData.Word & 0x0e));
 }
 
 static void test_fault_hold_and_release_sleep(void)
@@ -331,7 +308,7 @@ static void test_fault_hold_and_release_sleep(void)
 	{
 		run_light_tick();
 		CHECK(user_list.user_state==TOOL_ERROR_STOP && user_list.sleep_cnt==0);
-		CHECK(GPIOA->ODR & LED_LIGHT_PIN); /* 故障长按超过30s也不再关闭照明。 */
+		CHECK(TM1650_GetDigit(0)==0x40); /* 故障长按超过30s也不再关闭照明。 */
 		CHECK(!user_list.flag.bits.gToolEn);
 	}
 	CHECK(user_led_control.LedRunCnt_Once==3);
@@ -340,19 +317,60 @@ static void test_fault_hold_and_release_sleep(void)
 	{
 		run_light_tick();
 		CHECK(user_list.user_state==TOOL_ERROR_STOP);
-		CHECK((GPIOA->ODR & LED_LIGHT_PIN) && (ledData.Word & 0x0e));
+		CHECK((TM1650_GetDigit(0)==0x40) && (ledData.Word & 0x0e));
 	}
 	CHECK(user_list.sleep_cnt==5000);
 	run_light_tick();
 	CHECK(user_list.user_state==TOOL_POWER_DOWN);
-	CHECK(!(GPIOA->ODR & LED_LIGHT_PIN) && ledData.Word==0);
+	CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0 && ledData.Word==0);
 	CHECK(machine_error_hold.userErr_hold.bits.gNtcMos); /* 关灯不得清保护。 */
 	run_light_tick();
-	CHECK(!(GPIOA->ODR & EN_PIN));
+	CHECK(!(EN_PORT->ODR & EN_PIN));
+}
+
+static void test_mode_led_and_ntc(void)
+{
+	unsigned i;
+	/* 实板调速：DIG1绿色，LED8/G到LED5/D；情景保持LED5/D到LED7/F。 */
+	const uint8_t speed_masks[]={0x40,0x20,0x10,0x08};
+	const uint8_t scene_masks[]={0x08,0x10,0x20};
+	memset(&user_list,0,sizeof(user_list));
+	memset(&machine_error_hold,0,sizeof(machine_error_hold));
+	user_list.user_state=TOOL_STOP;
+	user_list.VBus_Vx100=2100;
+	tool_mode_init();
+	for(i=0;i<4;i++)
+	{
+		tool_mode_list.speed_gear=i+1;
+		UO_Led_Handler();
+		CHECK(TM1650_GetDigit(0)==speed_masks[i] && TM1650_GetDigit(1)==0);
+		CHECK(TM1650_GetDigit(2)==0 && TM1650_GetDigit(3)==0);
+	}
+	tool_mode_list.mode=TOOL_MODE_SCENE;
+	for(i=0;i<3;i++)
+	{
+		tool_mode_list.scene_gear=i+1;
+		UO_Led_Handler();
+		CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==scene_masks[i]);
+		CHECK(TM1650_GetDigit(2)==0 && TM1650_GetDigit(3)==0);
+	}
+	user_list.user_state=TOOL_POWER_DOWN;
+	UO_Led_Handler();
+	CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0 && ledData.Word==0);
+	/* 新10K/B3435+4.7K分压：700 ADC超过95℃，1100 ADC低于85℃。
+	 * 实际保护函数必须先置故障，再经过恢复去抖解除。 */
+	user_list.Vcc_cal_gain=32768;
+	mc_core_list.Board_ADC_DATA.u16NTC_MOS=700;
+	for(i=0;i<51;i++) User_Temperature_Handler();
+	CHECK(user_list.userErr.bits.gNtcMos);
+	mc_core_list.Board_ADC_DATA.u16NTC_MOS=1100;
+	for(i=0;i<501;i++) User_Temperature_Handler();
+	CHECK(!user_list.userErr.bits.gNtcMos);
 }
 
 uint32_t run_tests(void)
 {
+	tool_mode_init();
 	if(test_boot_scenario==5)
 	{
 		test_case=8;
@@ -369,6 +387,8 @@ uint32_t run_tests(void)
 	test_alarm_mapping();
 	if(test_failure_line) return test_failure_line;
 	test_case=2;
+	test_mode_led_and_ntc();
+	if(test_failure_line) return test_failure_line;
 	test_matrix_and_sampling();
 	if(test_failure_line) return test_failure_line;
 	test_case=3;

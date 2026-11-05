@@ -341,6 +341,8 @@ void user_state_control(void)
 		
 		case TOOL_POWER_DOWN:
 			user_list.sleep_cnt=0;
+			/* 中文：EN撤销前再执行同一停机保存门控，未停车或写失败时仍保留pending。 */
+			tool_mode_save_handle();
 			GPIO_ResetBits(EN_PORT, EN_PIN);  // 关闭电源使能（进入低功耗）
 			if(user_list.flag.bits.gToolTrigger)
 			{
@@ -361,4 +363,4 @@ void user_state_control(void)
 		break;
 	}
 }
-#include "D:/mym/NXN/9.henbangtai/dianzuan/core/NX32F002-V1_01-lib-release/tests/seven_led/test_seven_led.c"
+#include "D:/mym/NXN/3.yuantuo/V10_qizhiji/core/NX32F002-V1_01-lib-release/tests/seven_led/test_seven_led.c"

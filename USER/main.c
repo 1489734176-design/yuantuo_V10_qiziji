@@ -30,6 +30,8 @@
 #include "motor_control.h"
 #include "flash_data_save.h"
 #include "led.h"
+#include "tool_mode.h"
+#include "tm1650.h"
 #include "Bat_com.h"
 
 /**
@@ -105,6 +107,7 @@ int main(void)
 	/* Configure the clock */
 
 	u8 i;
+	uint8_t tm_bus_used; // 前台每1ms最多一次TM1650读写事务
 	//led_init();
 	#if LIMIT_SPEED_EN
 		u16 speed_pi_fer_count=0;
@@ -140,11 +143,13 @@ int main(void)
 	/* 电机控制核心初始化 */
 	mc_init();
 
-	/* 电源保持端口初始化（EN = PA11） */
+	/* 飞机板电源保持PB9，PA11/12专用于TM1650。 */
 	En_Port_init();
 	GPIO_WriteBit(EN_PORT, EN_PIN , Bit_SET);
 	/* LED初始化 */
 	led_init();
+	/* 总线初始化在电机中断开放之前，上电等待不影响运行保护。 */
+	TM1650_Init();
 
 	/* 电池通信初始化：配置端口、清零电池数据并启动通信链路 */
 	Bsp_Com_init();
@@ -162,7 +167,7 @@ int main(void)
 		systick_delay_us(1000);
 		motor_on_off_control();
 	}
-	/* 每次方向去抖之前等待新的复用输入采样。 */
+	/* 每次方向去抖之前等待独立PA13方向输入的新采样。 */
 	for(i=0;i<20;i++)
 	{
 		systick_delay_us(1000);
@@ -214,6 +219,8 @@ int main(void)
 			user_oc_handle();
 			/* MOS温度保护 */
 			User_Temperature_Handler();
+			/* 先处理模式/挡位，读键与显示刷新分帧，长按不会连加。 */
+			tm_bus_used=tool_mode_key_handle();
 			/* 目标PWM占空比计算（扳机电压映射） */
 			pwm_duty_aim_deal();
 
@@ -256,6 +263,8 @@ int main(void)
 			error_hold_updata();
 			/* LED显示处理（电量/挡位/故障） */
 			UO_Led_Handler();
+			/* 空闲帧刷新TM1650；每次仅一个配置或显存事务。 */
+			if(!tm_bus_used) led_tm1650_handle();
 			/* 根据状态机设置电机使能标志 */
 			/* 需同时满足工具许可、电池通信许可、无实时及锁存故障 */
 			if(user_list.flag.bits.gToolEn && Bat_Com_CanRun() &&
@@ -268,6 +277,8 @@ int main(void)
 			{
 				mc_core_list.motor_en=0;
 			}
+			/* 发布使能状态后，只有松扳机且电机完全停止才提交掉电设置。 */
+			tool_mode_save_handle();
 			/* 初始位置检测（IPD）触发
 			   同样受通信许可、电机使能、POSITION 状态及故障门控，
 			   取消启动时清除残留 IPD 请求，避免旁路许可执行检测 */
