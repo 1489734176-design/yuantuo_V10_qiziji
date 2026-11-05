@@ -3,7 +3,7 @@
 <title>Static Call Graph - [.\Objects\SPIN0230_DEMO.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image .\Objects\SPIN0230_DEMO.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6220000: Last Updated: Thu Nov  5 13:28:39 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6220000: Last Updated: Thu Nov  5 16:11:16 2026
 <BR><P>
 <H3>Maximum Stack Usage =        224 bytes + Unknown(Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -917,7 +917,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[11]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;TIM1_BRK_UP_TRG_COM_IRQHandler
 </UL>
 
-<P><STRONG><a name="[a9]"></a>LedError_Control</STRONG> (Thumb, 208 bytes, Stack size 28 bytes, led.o(.text.LedError_Control))
+<P><STRONG><a name="[aa]"></a>LedError_Control</STRONG> (Thumb, 208 bytes, Stack size 28 bytes, led.o(.text.LedError_Control))
 <BR><BR>[Stack]<UL><LI>Max Depth = 28<LI>Call Chain = LedError_Control
 </UL>
 <BR>[Called By]<UL><LI><a href="#[a7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;UO_Led_Handler
@@ -929,7 +929,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[a7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;UO_Led_Handler
 </UL>
 
-<P><STRONG><a name="[aa]"></a>LedSoc_Run</STRONG> (Thumb, 384 bytes, Stack size 20 bytes, led.o(.text.LedSoc_Run))
+<P><STRONG><a name="[ac]"></a>LedSoc_Run</STRONG> (Thumb, 384 bytes, Stack size 20 bytes, led.o(.text.LedSoc_Run))
 <BR><BR>[Stack]<UL><LI>Max Depth = 20<LI>Call Chain = LedSoc_Run
 </UL>
 <BR>[Called By]<UL><LI><a href="#[a7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;UO_Led_Handler
@@ -1208,7 +1208,7 @@ Global Symbols
 <LI><a href="#[99]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Peripheral_Init
 </UL>
 
-<P><STRONG><a name="[a8]"></a>TM1650_Clear</STRONG> (Thumb, 40 bytes, Stack size 8 bytes, tm1650.o(.text.TM1650_Clear))
+<P><STRONG><a name="[a9]"></a>TM1650_Clear</STRONG> (Thumb, 40 bytes, Stack size 8 bytes, tm1650.o(.text.TM1650_Clear))
 <BR><BR>[Stack]<UL><LI>Max Depth = 8<LI>Call Chain = TM1650_Clear
 </UL>
 <BR>[Called By]<UL><LI><a href="#[a7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;UO_Led_Handler
@@ -1282,15 +1282,15 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[cc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;mos_check_current
 </UL>
 
-<P><STRONG><a name="[a7]"></a>UO_Led_Handler</STRONG> (Thumb, 152 bytes, Stack size 24 bytes, led.o(.text.UO_Led_Handler))
+<P><STRONG><a name="[a7]"></a>UO_Led_Handler</STRONG> (Thumb, 252 bytes, Stack size 24 bytes, led.o(.text.UO_Led_Handler))
 <BR><BR>[Stack]<UL><LI>Max Depth = 52<LI>Call Chain = UO_Led_Handler &rArr; LedError_Control
 </UL>
 <BR>[Calls]<UL><LI><a href="#[ad]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;TM1650_SetDigit
-<LI><a href="#[ac]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;tool_mode_gear
+<LI><a href="#[ac]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LedSoc_Run
 <LI><a href="#[ab]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LedError_Run
-<LI><a href="#[aa]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LedSoc_Run
-<LI><a href="#[a9]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LedError_Control
-<LI><a href="#[a8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;TM1650_Clear
+<LI><a href="#[aa]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;LedError_Control
+<LI><a href="#[a9]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;TM1650_Clear
+<LI><a href="#[a8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;tool_mode_gear
 </UL>
 <BR>[Called By]<UL><LI><a href="#[19]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
@@ -1409,7 +1409,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[19]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[b5]"></a>led_init</STRONG> (Thumb, 108 bytes, Stack size 24 bytes, led.o(.text.led_init))
+<P><STRONG><a name="[b5]"></a>led_init</STRONG> (Thumb, 116 bytes, Stack size 24 bytes, led.o(.text.led_init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 80<LI>Call Chain = led_init &rArr; Bsp_dir_init &rArr; GPIO_Init
 </UL>
 <BR>[Calls]<UL><LI><a href="#[73]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Bsp_dir_init
@@ -1516,7 +1516,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[19]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[a0]"></a>motor_block_detect</STRONG> (Thumb, 260 bytes, Stack size 16 bytes, motor_control.o(.text.motor_block_detect))
+<P><STRONG><a name="[a0]"></a>motor_block_detect</STRONG> (Thumb, 264 bytes, Stack size 16 bytes, motor_control.o(.text.motor_block_detect))
 <BR><BR>[Stack]<UL><LI>Max Depth = 16<LI>Call Chain = motor_block_detect
 </UL>
 <BR>[Called By]<UL><LI><a href="#[11]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;TIM1_BRK_UP_TRG_COM_IRQHandler
@@ -1552,7 +1552,7 @@ Global Symbols
 <BR><BR>[Stack]<UL><LI>Max Depth = 112<LI>Call Chain = read_user_data &rArr; flash_find_latest
 </UL>
 <BR>[Calls]<UL><LI><a href="#[b3]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;flash_find_latest
-<LI><a href="#[ac]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;tool_mode_gear
+<LI><a href="#[a8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;tool_mode_gear
 <LI><a href="#[d4]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;tool_mode_init
 </UL>
 <BR>[Called By]<UL><LI><a href="#[19]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
@@ -1594,7 +1594,7 @@ Global Symbols
 <LI><a href="#[39]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;[Anonymous Symbol]
 </UL>
 
-<P><STRONG><a name="[db]"></a>tool_mode_duty</STRONG> (Thumb, 104 bytes, Stack size 16 bytes, tool_mode.o(.text.tool_mode_duty))
+<P><STRONG><a name="[db]"></a>tool_mode_duty</STRONG> (Thumb, 120 bytes, Stack size 16 bytes, tool_mode.o(.text.tool_mode_duty))
 <BR><BR>[Stack]<UL><LI>Max Depth = 32<LI>Call Chain = tool_mode_duty &rArr; __aeabi_uidiv
 </UL>
 <BR>[Calls]<UL><LI><a href="#[dc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_uidiv
@@ -1602,7 +1602,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[c8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;user_gears_handle
 </UL>
 
-<P><STRONG><a name="[ac]"></a>tool_mode_gear</STRONG> (Thumb, 20 bytes, Stack size 0 bytes, tool_mode.o(.text.tool_mode_gear))
+<P><STRONG><a name="[a8]"></a>tool_mode_gear</STRONG> (Thumb, 20 bytes, Stack size 0 bytes, tool_mode.o(.text.tool_mode_gear))
 <BR><BR>[Called By]<UL><LI><a href="#[a7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;UO_Led_Handler
 <LI><a href="#[b9]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;read_user_data
 </UL>
@@ -1612,8 +1612,8 @@ Global Symbols
 <LI><a href="#[b7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;user_para_init
 </UL>
 
-<P><STRONG><a name="[c6]"></a>tool_mode_key_handle</STRONG> (Thumb, 244 bytes, Stack size 16 bytes, tool_mode.o(.text.tool_mode_key_handle))
-<BR><BR>[Stack]<UL><LI>Max Depth = 88<LI>Call Chain = tool_mode_key_handle &rArr; TM1650_ReadKey &rArr; TM1650_WriteByte &rArr; systick_delay_us
+<P><STRONG><a name="[c6]"></a>tool_mode_key_handle</STRONG> (Thumb, 308 bytes, Stack size 24 bytes, tool_mode.o(.text.tool_mode_key_handle))
+<BR><BR>[Stack]<UL><LI>Max Depth = 96<LI>Call Chain = tool_mode_key_handle &rArr; TM1650_ReadKey &rArr; TM1650_WriteByte &rArr; systick_delay_us
 </UL>
 <BR>[Calls]<UL><LI><a href="#[a4]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;TM1650_ReadKey
 </UL>
@@ -1657,7 +1657,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[19]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[c9]"></a>user_state_control</STRONG> (Thumb, 476 bytes, Stack size 24 bytes, user_control.o(.text.user_state_control))
+<P><STRONG><a name="[c9]"></a>user_state_control</STRONG> (Thumb, 484 bytes, Stack size 24 bytes, user_control.o(.text.user_state_control))
 <BR><BR>[Stack]<UL><LI>Max Depth = 200<LI>Call Chain = user_state_control &rArr; tool_mode_save_handle &rArr; save_user_data_checked &rArr; flash_find_latest
 </UL>
 <BR>[Calls]<UL><LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Bat_Com_Sleep

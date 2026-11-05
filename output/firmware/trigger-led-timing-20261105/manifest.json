@@ -1,0 +1,19 @@
+{
+  "flash_start": "0x8000000",
+  "flash_end_exclusive": "0x8005578",
+  "binary_bytes": 21880,
+  "artifacts": {
+    "SPIN0230_DEMO.hex": {
+      "bytes": 61595,
+      "sha256": "b35df706cb4bf2a7d68887fdeffdf606165e4d20eb93533014de5160de12ecdc"
+    },
+    "SPIN0230_DEMO.bin": {
+      "bytes": 21880,
+      "sha256": "b0bf4dd82cb6179abda6b7fe3b5e8a87665bc08925cb1a7871bd4f4df7362cd5"
+    },
+    "SPIN0230_DEMO.axf": {
+      "bytes": 211000,
+      "sha256": "8847192e6532ca05e46957e3c67c61c6e6bd2941479608e35e9b397a32396e68"
+    }
+  }
+}

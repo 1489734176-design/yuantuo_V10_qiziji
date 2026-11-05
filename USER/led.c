@@ -9,6 +9,8 @@ User_LED_Control_t user_led_control;
 volatile BITS_UNION ledData;
 static uint8_t led_scan_index;
 static uint8_t tm_display_state=0xff;
+static uint8_t battery_trigger_previous;
+static uint16_t battery_display_ms=BATTERY_LED_TIME;
 
 /* 切灯先让三端模拟高阻，再设置电平并使能选中的阳/阴极，防止串亮。
  * 只修改L1/L2/L3，不能触碰PB9电源保持、PA11/12总线和PA13方向。 */
@@ -18,6 +20,9 @@ static void led_matrix_release(void)
 	MODIFY_REG(GPIOB->CRH, GPIO_CRH_MODE8 | GPIO_CRH_CNF8, 0);
 }
 
+/**
+ * @brief 初始化三IO电量灯、独立方向及按键输入，并清零电量显示窗口。
+ */
 void led_init(void)
 {
 	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOA_Msk | RCC_AHBENR_GPIOB_Msk, ENABLE);
@@ -31,6 +36,8 @@ void led_init(void)
 	ledData.Word=0;
 	led_scan_index=0;
 	tm_display_state=0xff;
+	battery_trigger_previous=0;
+	battery_display_ms=BATTERY_LED_TIME;
 	user_list.led_input_valid=0;
 	user_list.Key_Data=1;
 	user_list.Dir_Data=1;
@@ -76,19 +83,39 @@ void LED_Scan(void)
 	}
 }
 
+/**
+ * @brief 每1ms更新电量/故障显示和当前挡位灯；电量显示5s，模式灯保持至休眠。
+ *        各挡灯号读取parameter.h，DIG1为调速绿色，DIG2为情景红色。
+ */
 void UO_Led_Handler(void)
 {
+	static const uint8_t speed_led[4]={
+		TOOL_SPEED_GEAR1_LED, TOOL_SPEED_GEAR2_LED,
+		TOOL_SPEED_GEAR3_LED, TOOL_SPEED_GEAR4_LED
+	};
+	static const uint8_t scene_led[3]={
+		TOOL_SCENE_GEAR1_LED, TOOL_SCENE_GEAR2_LED, TOOL_SCENE_GEAR3_LED
+	};
+	uint8_t gear=tool_mode_gear();
+	uint8_t led_number;
 	uint8_t mask;
+	uint8_t trigger=user_list.flag.bits.gToolTrigger;
+	uint8_t battery_display_en;
+	/* 只有松开后重新扣动才重启5s；长按及松手不清零电量计时。 */
+	if(trigger && !battery_trigger_previous) battery_display_ms=0;
+	battery_trigger_previous=trigger;
 	if(user_list.user_state==TOOL_POWER_DOWN)
 	{
 		/* LED4照明随整板EN断电，挡位显存和三IO电量灯同时清零。 */
 		ledData.Word=0;
+		battery_display_ms=BATTERY_LED_TIME;
 		user_led_control.LedRunTimes=0;
 		user_led_control.LedDeal=0;
 		TM1650_Clear();
 		return;
 	}
-	if(LedError_Control() && user_list.flag.bits.gToolTrigger)
+	battery_display_en=(battery_display_ms<BATTERY_LED_TIME);
+	if(battery_display_en && LedError_Control() && trigger)
 	{
 		LedError_Run();
 	}
@@ -96,18 +123,31 @@ void UO_Led_Handler(void)
 	{
 		user_led_control.LedDeal=0;
 		user_led_control.LedRunTimes=0;
-		LedSoc_Run(user_list.VBus_Vx100, 1, 0);
+		LedSoc_Run(user_list.VBus_Vx100, battery_display_en, 0);
 	}
-	/* 实板DIG1绿色、DIG2红色；调速1..4档按LED8/G到LED5/D单灯显示。
-	 * 情景1..3档仍按LED5/D、LED6/E、LED7/F显示，只修正颜色通道。 */
-	mask=(uint8_t)(1u<<(tool_mode_list.mode==TOOL_MODE_SPEED ?
-		(7u-tool_mode_gear()) : (tool_mode_gear()+2u)));
+	/* 计数到5s饱和，避免长时间扣住后溢出重新点亮；模式灯保持到休眠。 */
+	if(battery_display_ms<BATTERY_LED_TIME) battery_display_ms++;
+	/* LED5/6/7/8对应D/E/F/G，即显存bit3/4/5/6；宏中直接填写灯编号。 */
+	if(tool_mode_list.mode==TOOL_MODE_SCENE)
+	{
+		if(gear<1 || gear>3) gear=1;
+		led_number=scene_led[gear-1];
+	}
+	else
+	{
+		if(gear<1 || gear>4) gear=1;
+		led_number=speed_led[gear-1];
+	}
+	mask=(uint8_t)(1u<<(led_number-2u));
 	TM1650_SetDigit(0, tool_mode_list.mode==TOOL_MODE_SPEED ? mask : 0);
 	TM1650_SetDigit(1, tool_mode_list.mode==TOOL_MODE_SCENE ? mask : 0);
 	TM1650_SetDigit(2, 0);
 	TM1650_SetDigit(3, 0);
 }
 
+/**
+ * @brief 前台分帧刷新TM1650显示开关及显存，每次最多执行一项总线事务。
+ */
 void led_tm1650_handle(void)
 {
 	uint8_t cfg=user_list.user_state==TOOL_POWER_DOWN ? TM1650_CFG_OFF : TM1650_CFG_ON;
@@ -122,6 +162,9 @@ void led_tm1650_handle(void)
 	}
 }
 
+/**
+ * @brief 按锁存故障优先级选择电量灯闪烁报码，返回是否存在需要显示的故障。
+ */
 uint8_t LedError_Control(void)
 {
 #if RESTAR_EN
@@ -204,6 +247,9 @@ uint8_t LedError_Control(void)
 	return (user_led_control.LedRunCnt_Once!=0);
 }
 
+/**
+ * @brief 每1ms推进故障报码闪烁节奏，由电量显示窗口决定是否继续调用。
+ */
 void LedError_Run(void)
 {
     static uint16_t bzCnt  = 0;     /* 当前剩余闪烁段数 */
@@ -281,6 +327,12 @@ void LedError_Run(void)
 }
 
 static const uint16_t deltaVolt=20; /* 0.2V滞回，沿用参考程序 */
+/**
+ * @brief 根据电池电压及滞回规则更新电量等级；显示禁用时关闭三盏电量灯。
+ * @param volt_vx100 电池电压，单位为0.01V。
+ * @param display_en 电量显示使能。
+ * @param fast_mode 非零时立即执行等级滞回更新。
+ */
 void LedSoc_Run(uint32_t volt_vx100,uint8_t display_en,uint8_t fast_mode)
 {
 	static uint16_t ms500cnt = 0;    // 500ms时间基准计数器

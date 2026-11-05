@@ -19,6 +19,8 @@ The first command performs an incremental build; the second rebuilds all sources
 
 Match the file being edited: application modules commonly use tabs, while vendor drivers generally use four spaces. Keep braces on their own lines. Use `snake_case` for application functions and variables, uppercase snake case for configuration macros, and established suffixes such as `_t`, `_TypeDef`, and `_Struct` for types. Pair new modules as `name.c` and `USER/inc/name.h` (or the owning module's `inc/` directory). Preserve existing Doxygen blocks and include guards. Avoid broad reformatting, especially in vendor sources.
 
+Edit original `.c` and `.h` files directly; do not use Python scripts to rewrite source files. Add Chinese function-head comments for new or modified functions. Write Chinese comments without a `中文：` prefix. Keep configurable mode/gear LED numbers and duty percentages in `USER/inc/parameter.h`.
+
 ## Testing Guidelines
 
 There is no host-side test framework or coverage gate. Every change must complete a warning-reviewed clean rebuild. For motor-control, ADC, PWM, direction, voltage, or protection changes, test on the intended board and record hardware revision, supply voltage, load, parameter set, and observed safety behavior in the pull request. Never bypass current, thermal, undervoltage, watchdog, or stall protections merely to make a bench test pass.

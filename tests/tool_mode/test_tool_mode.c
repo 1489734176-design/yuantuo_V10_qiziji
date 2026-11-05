@@ -1,4 +1,4 @@
-/* 中文：运行真实控制/存储代码；仅TM1650与Flash物理操作由模拟硬件替代。 */
+/* 运行真实控制/存储代码；仅TM1650与Flash物理操作由模拟硬件替代。 */
 volatile uint32_t test_failure_line, test_case, test_checks;
 #define CHECK(expr) do { test_checks++; if(!(expr)) { test_failure_line=__LINE__; return; } } while(0)
 #define PAGE30 0x08007800u
@@ -20,7 +20,7 @@ FLASH_Status FLASH_ErasePage(uint32_t address)
 	flash_operations++;
 	for(i=0;i<512;i++)
 	{
-		/* 中文：用半页擦除失败验证另一页最新记录始终保留。 */
+		/* 用半页擦除失败验证另一页最新记录始终保留。 */
 		if(fail_after==0) return FLASH_TIMEOUT;
 		page[i]=0xffff;
 		if(fail_after>0) fail_after--;
@@ -110,22 +110,22 @@ static void test_key_debounce(void)
 	key_raw=0; key_ms(20); key_raw=0x47; key_ms(100);
 	CHECK(tool_mode_gear()==2);
 	key_raw=0; key_ms(30); press(0x47); CHECK(tool_mode_gear()==3);
-	/* 中文：其他键及组合键不能冒充K2；换键前必须确认全部释放。 */
+	/* 其他键及组合键不能冒充K2；换键前必须确认全部释放。 */
 	key_raw=0x45; key_ms(30); key_raw=0x47; key_ms(30);
 	CHECK(tool_mode_gear()==3);
 	key_raw=0; key_ms(30); press(0x46);
 	CHECK(tool_mode_list.mode==TOOL_MODE_SCENE && tool_mode_gear()==1);
 	key_raw=0xc7; key_ms(30); key_raw=0x47; key_ms(30);
 	CHECK(tool_mode_list.mode==TOOL_MODE_SCENE && tool_mode_gear()==1);
-	/* 中文：bit6未置位即释放；随后三次有效K2才允许切回调速。 */
+	/* bit6未置位即释放；随后三次有效K2才允许切回调速。 */
 	key_raw=0x87; key_ms(30); press(0x47);
 	CHECK(tool_mode_list.mode==TOOL_MODE_SPEED && tool_mode_gear()==3);
 }
 static void test_duty(void)
 {
-	/* 当前39/58/78/98%挡位表，周期1874；中点扳机输入1077。 */
-	static const uint16_t maximum[]={730,1086,1461,1836};
-	static const uint16_t middle[]={505,683,870,1058};
+	/* 当前38/58/78/100%挡位表，周期1874；中点扳机输入1077。 */
+	static const uint16_t maximum[]={712,1086,1461,1874};
+	static const uint16_t middle[]={496,683,870,1077};
 	uint8_t i;
 	erase_fixture(); boot_fixture();
 	for(i=0;i<4;i++)
@@ -141,10 +141,45 @@ static void test_duty(void)
 		tool_mode_key_event(0x47);
 	}
 	tool_mode_key_event(0x46);
-	CHECK(tool_mode_duty(281)==374 && tool_mode_duty(1874)==374);
+	CHECK(tool_mode_duty(281)==337 && tool_mode_duty(1874)==337);
 	tool_mode_key_event(0x46); CHECK(tool_mode_duty(281)==1874);
 	tool_mode_key_event(0x46); CHECK(tool_mode_duty(281)==1874);
 }
+static void test_trigger_key_inhibit(void)
+{
+	erase_fixture(); boot_fixture();
+	user_list.sleep_cnt=1234;
+	user_list.flag.bits.gToolTrigger=1;
+	key_raw=0x46; key_ms(100);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SPEED && tool_mode_gear()==1);
+	CHECK(!tool_mode_list.save_pending && user_list.sleep_cnt==1234);
+	tool_mode_key_event(0x47);
+	CHECK(tool_mode_gear()==1 && !tool_mode_list.save_pending);
+	/* 松扳机时K3仍按住，不得补执行被屏蔽的按压。 */
+	user_list.flag.bits.gToolTrigger=0; key_ms(100);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SPEED);
+	key_ack=0; key_raw=0; key_ms(100); key_ack=1;
+	key_raw=0x46; key_ms(100);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SPEED);
+	key_raw=0; key_ms(30); press(0x46);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SCENE && tool_mode_gear()==1);
+	user_list.flag.bits.gToolTrigger=1; key_raw=0x47; key_ms(100);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SCENE);
+	user_list.flag.bits.gToolTrigger=0; key_ms(100);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SCENE);
+	key_raw=0; key_ms(30); press(0x47);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SPEED && tool_mode_gear()==1);
+	/* 未完成的20ms去抖被1ms扣动打断，松手后不得补执行。 */
+	key_raw=0x47; key_ms(20);
+	user_list.flag.bits.gToolTrigger=1; key_ms(1);
+	user_list.flag.bits.gToolTrigger=0; key_ms(100);
+	CHECK(tool_mode_gear()==1);
+	key_raw=0; key_ms(30); press(0x47); CHECK(tool_mode_gear()==2);
+	user_list.user_state=TOOL_POWER_DOWN;
+	tool_mode_key_event(0x46);
+	CHECK(tool_mode_list.mode==TOOL_MODE_SPEED && tool_mode_gear()==2);
+}
+
 static void test_save_and_gates(void)
 {
 	uint32_t before;
@@ -178,7 +213,7 @@ static void test_partial_and_crc(void)
 	}
 	erase_fixture(); boot_fixture(); tool_mode_key_event(0x47); tool_mode_save_handle();
 	tool_mode_key_event(0x47); tool_mode_save_handle();
-	/* 中文：更晚记录的数据损坏时回退前一条有效设置。 */
+	/* 更晚记录的数据损坏时回退前一条有效设置。 */
 	*((volatile uint16_t *)(PAGE30+20+6))=0;
 	boot_fixture(); CHECK(tool_mode_gear()==2);
 }
@@ -188,7 +223,7 @@ static void test_rollover_power_failure(void)
 	erase_fixture(); boot_fixture();
 	for(i=0;i<51;i++) { tool_mode_key_event(0x47); tool_mode_save_handle(); }
 	CHECK(tool_mode_gear()==4);
-	/* 中文：下一页擦到一半失败，掉电重启仍从旧页恢复。 */
+	/* 下一页擦到一半失败，掉电重启仍从旧页恢复。 */
 	*((volatile uint16_t *)PAGE31)=0;
 	tool_mode_key_event(0x47); fail_after=256; tool_mode_save_handle();
 	CHECK(tool_mode_list.save_pending==1);
@@ -219,7 +254,7 @@ static void test_flash_readback(void)
 	erase_fixture(); boot_fixture();
 	for(i=0;i<51;i++) { tool_mode_key_event(0x47); tool_mode_save_handle(); }
 	CHECK(tool_mode_gear()==4);
-	/* 中文：擦除HAL报告成功但标志位未擦净，不能在旧magic下写入新数据。 */
+	/* 擦除HAL报告成功但标志位未擦净，不能在旧magic下写入新数据。 */
 	erase_bad_readback=1; tool_mode_key_event(0x47); tool_mode_save_handle();
 	CHECK(tool_mode_list.save_pending==1);
 	boot_fixture(); CHECK(tool_mode_gear()==4);
@@ -246,7 +281,7 @@ static void test_rollover_cutpoints(void)
 }
 static void test_versions_ranges_and_wrap(void)
 {
-	/* 中文：由独立Python binascii.crc_hqx计算的完整字面记录，覆盖版本/范围/回绕判定。 */
+	/* 由独立Python binascii.crc_hqx计算的完整字面记录，覆盖版本/范围/回绕判定。 */
 	static const uint16_t before_wrap[]={0xa65a,1,0,4,1,0xffff,0xffff,0x548e};
 	static const uint16_t after_wrap[]={0xa65a,1,1,3,2,0,0,0xabfc};
 	static const uint16_t bad_version[]={0xa65a,2,0,4,1,1,0,0xbe6a};
@@ -276,13 +311,13 @@ static void test_real_pwm_ramp(void)
 	motor_control_list.pwm_duty_aim=tool_mode_duty(281);
 	pwm_set(); CHECK(last_pwm==281);
 	previous=last_pwm;
-	for(i=0;i<200;i++)
+	for(i=0;i<1200;i++)
 	{
-		pwm_set(); CHECK(last_pwm>=previous && last_pwm<=374); previous=last_pwm;
+		pwm_set(); CHECK(last_pwm>=previous && last_pwm<=337); previous=last_pwm;
 	}
-	CHECK(last_pwm==374);
+	CHECK(last_pwm==337);
 	tool_mode_key_event(0x46); motor_control_list.pwm_duty_aim=tool_mode_duty(281);
-	for(i=0;i<1600;i++)
+	for(i=0;i<12000;i++)
 	{
 		pwm_set(); CHECK(last_pwm>=previous && last_pwm<=1874); previous=last_pwm;
 	}
@@ -297,7 +332,7 @@ void run_tests(void)
 	mc_core_list.Board_ADC_DATA.u16VR=4000;
 	pwm_duty_aim_deal(); user_gears_handle();
 	test_case=1;
-	/* 中文：空Flash调速1档满扳机应为40%；旧固件实际输出100%，这是预期红测。 */
+	/* 空Flash调速1档满扳机应为40%；旧固件实际输出100%，这是预期红测。 */
 	CHECK(motor_control_list.pwm_duty_aim==749);
 #else
 #define RUN(n,fn) do { test_case=n; fn(); if(test_failure_line) return; } while(0)
@@ -306,5 +341,6 @@ void run_tests(void)
 	RUN(6,test_rollover_power_failure); RUN(7,test_legacy);
 	RUN(8,test_flash_readback); RUN(9,test_rollover_cutpoints);
 	RUN(10,test_versions_ranges_and_wrap); RUN(11,test_real_pwm_ramp);
+	RUN(12,test_trigger_key_inhibit);
 #endif
 }

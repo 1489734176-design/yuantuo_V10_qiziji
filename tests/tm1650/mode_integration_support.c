@@ -15,7 +15,7 @@ const uint32_t test_sda_pin = TM1650_SDA_PIN;
 const uint32_t test_scl_pin = TM1650_SCL_PIN;
 volatile uint32_t test_delay_us;
 
-/* 中文：只替代物理等待和本回归未调用的板级/Flash操作；键盘和显示均用真实代码。 */
+/* 只替代物理等待和本回归未调用的板级/Flash操作；键盘和显示均用真实代码。 */
 void systick_delay_us(uint32_t us) { test_delay_us += us; }
 void Bsp_Key_Init(void) {}
 void Bsp_dir_init(void) {}
@@ -38,4 +38,9 @@ uint32_t test_mode_state(void)
 void test_power_down(void)
 {
 	user_list.user_state=TOOL_POWER_DOWN;
+}
+
+void test_trigger(uint32_t pressed)
+{
+	user_list.flag.bits.gToolTrigger=(pressed!=0);
 }

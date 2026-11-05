@@ -265,26 +265,28 @@ static void test_release_sleep_and_repress(void)
 	unsigned i;
 	reset_light_fixture();
 	run_light_tick();
-	CHECK(TM1650_GetDigit(0)==0x40);
-	CHECK((ledData.Word & 0x0e)!=0);
+	CHECK(TM1650_GetDigit(0)==0x40 && (ledData.Word & 0x0e));
 	user_list.flag.bits.gToolTrigger=0;
-	run_light_tick(); /* RUN -> STOP，下一次1ms任务开始休眠计数。 */
+	run_light_tick();
 	for(i=0;i<1000;i++) run_light_tick();
-	CHECK(user_list.user_state==TOOL_STOP && (TM1650_GetDigit(0)==0x40));
+	CHECK(user_list.user_state==TOOL_STOP && user_list.sleep_cnt==1000);
 	user_list.flag.bits.gToolTrigger=1;
 	run_light_tick();
 	CHECK(user_list.user_state==TOOL_RUN && user_list.sleep_cnt==0);
+	CHECK(ledData.Word & 0x0e);
 	user_list.flag.bits.gToolTrigger=0;
 	run_light_tick();
-	for(i=0;i<5000;i++)
+	for(i=1;i<=14999;i++)
 	{
 		run_light_tick();
 		CHECK(user_list.user_state==TOOL_STOP);
-		CHECK((TM1650_GetDigit(0)==0x40) && (ledData.Word & 0x0e));
+		CHECK(TM1650_GetDigit(0)==0x40 && (EN_PORT->ODR & EN_PIN));
+		if(i<4999) CHECK(ledData.Word & 0x0e);
+		else CHECK((ledData.Word & 0x0e)==0);
 	}
-	CHECK(user_list.sleep_cnt==5000);
+	CHECK(user_list.sleep_cnt==14999);
 	run_light_tick();
-	CHECK(user_list.user_state==TOOL_POWER_DOWN); /* 与参考一致：计数>5000 */
+	CHECK(user_list.user_state==TOOL_POWER_DOWN); /* 松手计满15s休眠。 */
 	CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0 && ledData.Word==0);
 	CHECK(!user_list.flag.bits.gToolEn);
 	run_light_tick();
@@ -294,7 +296,42 @@ static void test_release_sleep_and_repress(void)
 	user_list.flag.bits.gToolTrigger=1;
 	run_light_tick();
 	CHECK(user_list.user_state==TOOL_STOP && (EN_PORT->ODR & EN_PIN));
-	CHECK((TM1650_GetDigit(0)==0x40) && (ledData.Word & 0x0e));
+	CHECK(TM1650_GetDigit(0)==0x40 && (ledData.Word & 0x0e));
+}
+
+static void test_battery_window_hold_and_repress(void)
+{
+	unsigned i;
+	reset_light_fixture();
+	run_light_tick();
+	CHECK(ledData.Word & 0x0e);
+	/* 持续扣住超过uint16_t范围，5s超时后不能溢出重新点亮。 */
+	for(i=1;i<=66000;i++)
+	{
+		run_light_tick();
+		if(i<5000) CHECK(ledData.Word & 0x0e);
+		else CHECK((ledData.Word & 0x0e)==0);
+		CHECK(user_list.user_state==TOOL_RUN && user_list.sleep_cnt==0);
+		CHECK(TM1650_GetDigit(0)==0x40 && (EN_PORT->ODR & EN_PIN));
+	}
+	user_list.flag.bits.gToolTrigger=0;
+	run_light_tick();
+	for(i=0;i<1000;i++) run_light_tick();
+	CHECK((ledData.Word & 0x0e)==0 && user_list.sleep_cnt==1000);
+	/* 模式键只能延长待机，不能重启电量5s窗口。 */
+	tool_mode_key_event(TOOL_MODE_KEY_SCENE);
+	run_light_tick();
+	CHECK((ledData.Word & 0x0e)==0 && TM1650_GetDigit(1)==0x40);
+	user_list.flag.bits.gToolTrigger=1;
+	run_light_tick();
+	CHECK((ledData.Word & 0x0e)!=0 && user_list.sleep_cnt==0);
+	for(i=1;i<5000;i++)
+	{
+		run_light_tick();
+		CHECK(ledData.Word & 0x0e);
+	}
+	run_light_tick();
+	CHECK((ledData.Word & 0x0e)==0 && TM1650_GetDigit(1)==0x40);
 }
 
 static void test_fault_hold_and_release_sleep(void)
@@ -308,18 +345,18 @@ static void test_fault_hold_and_release_sleep(void)
 	{
 		run_light_tick();
 		CHECK(user_list.user_state==TOOL_ERROR_STOP && user_list.sleep_cnt==0);
-		CHECK(TM1650_GetDigit(0)==0x40); /* 故障长按超过30s也不再关闭照明。 */
+		CHECK(TM1650_GetDigit(0)==0x40 && (EN_PORT->ODR & EN_PIN));
+		if(i>=5000) CHECK((ledData.Word & 0x0e)==0);
 		CHECK(!user_list.flag.bits.gToolEn);
 	}
-	CHECK(user_led_control.LedRunCnt_Once==3);
 	user_list.flag.bits.gToolTrigger=0;
-	for(i=0;i<5000;i++)
+	for(i=0;i<14999;i++)
 	{
 		run_light_tick();
 		CHECK(user_list.user_state==TOOL_ERROR_STOP);
-		CHECK((TM1650_GetDigit(0)==0x40) && (ledData.Word & 0x0e));
+		CHECK(TM1650_GetDigit(0)==0x40 && (ledData.Word & 0x0e)==0);
 	}
-	CHECK(user_list.sleep_cnt==5000);
+	CHECK(user_list.sleep_cnt==14999);
 	run_light_tick();
 	CHECK(user_list.user_state==TOOL_POWER_DOWN);
 	CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0 && ledData.Word==0);
@@ -331,9 +368,9 @@ static void test_fault_hold_and_release_sleep(void)
 static void test_mode_led_and_ntc(void)
 {
 	unsigned i;
-	/* 实板调速：DIG1绿色，LED8/G到LED5/D；情景保持LED5/D到LED7/F。 */
+	/* 实板调速：DIG1绿色，LED8/G到LED5/D；情景LED8/G、LED6/E、LED5/D。 */
 	const uint8_t speed_masks[]={0x40,0x20,0x10,0x08};
-	const uint8_t scene_masks[]={0x08,0x10,0x20};
+	const uint8_t scene_masks[]={0x40,0x10,0x08};
 	memset(&user_list,0,sizeof(user_list));
 	memset(&machine_error_hold,0,sizeof(machine_error_hold));
 	user_list.user_state=TOOL_STOP;
@@ -377,6 +414,14 @@ uint32_t run_tests(void)
 		test_swd_startup_not_remapped_early();
 		return test_failure_line;
 	}
+	if(test_boot_scenario>=6)
+	{
+		test_case=test_boot_scenario;
+		if(test_boot_scenario==6) test_battery_window_hold_and_repress();
+		if(test_boot_scenario==7) test_release_sleep_and_repress();
+		if(test_boot_scenario==8) test_fault_hold_and_release_sleep();
+		return test_failure_line;
+	}
 	if(test_boot_scenario)
 	{
 		test_case=1;
@@ -399,12 +444,6 @@ uint32_t run_tests(void)
 	if(test_failure_line) return test_failure_line;
 	test_case=5;
 	test_soc_immediate_run();
-	if(test_failure_line) return test_failure_line;
-	test_case=6;
-	test_release_sleep_and_repress();
-	if(test_failure_line) return test_failure_line;
-	test_case=7;
-	test_fault_hold_and_release_sleep();
 	if(test_failure_line) return test_failure_line;
 	test_case=8;
 	test_swd_startup_not_remapped_early();

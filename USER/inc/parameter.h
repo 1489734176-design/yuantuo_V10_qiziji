@@ -22,7 +22,48 @@
 
 #define SLOWLOOP_FRE                (1000) //慢循环频率，单位1ms
 
-#define  SLEEP_TIME                 				5000ul//10000
+#define  SLEEP_TIME                 				15000ul // 松开扳机后15s休眠，重新扣动清零
+#define BATTERY_LED_TIME (5000u) // 每次重新扣动扳机，电量灯显示5s
+
+/* 双模式挡位配置：修改本节数值并重新编译即可生效。
+ * 灯号填写原理图LED编号，范围5～8；同一时刻只亮当前挡对应的一个灯。
+ * 占空比单位为百分比，范围15～100，最低输出仍受MIN_TOOL_DUTY限制。
+ * 调速模式：扳机从最低占空比连续调节到本挡上限。
+ * 情景模式：每挡固定目标占空比，扳机只控制启停，软启动及保护继续生效。
+ */
+#define TOOL_SPEED_GEAR1_LED          (8u)  // 调速1挡灯号
+#define TOOL_SPEED_GEAR2_LED          (7u)  // 调速2挡灯号
+#define TOOL_SPEED_GEAR3_LED          (6u)  // 调速3挡灯号
+#define TOOL_SPEED_GEAR4_LED          (5u)  // 调速4挡灯号
+#define TOOL_SCENE_GEAR1_LED          (8u)  // 情景1挡灯号
+#define TOOL_SCENE_GEAR2_LED          (7u)  // 情景2挡灯号
+#define TOOL_SCENE_GEAR3_LED          (6u)  // 情景3挡灯号
+
+#define TOOL_SPEED_GEAR1_DUTY_PERCENT (38u) // 调速1挡占空比上限，单位%
+#define TOOL_SPEED_GEAR2_DUTY_PERCENT (58u) // 调速2挡占空比上限，单位%
+#define TOOL_SPEED_GEAR3_DUTY_PERCENT (78u) // 调速3挡占空比上限，单位%
+#define TOOL_SPEED_GEAR4_DUTY_PERCENT (100u) // 调速4挡占空比上限，单位%
+#define TOOL_SCENE_GEAR1_DUTY_PERCENT (18u) // 情景1挡固定目标，单位%
+#define TOOL_SCENE_GEAR2_DUTY_PERCENT (100u) // 情景2挡固定目标，单位%
+#define TOOL_SCENE_GEAR3_DUTY_PERCENT (100u) // 情景3挡固定目标，单位%
+
+/* 编译时检查配置范围，避免错误灯号移位或超出有效占空比。 */
+#define TOOL_MODE_LED_VALID(number) ((number)>=5 && (number)<=8)
+#define TOOL_MODE_DUTY_VALID(percent) ((percent)>=15 && (percent)<=100)
+#if !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR1_LED) || !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR2_LED) || \
+    !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR3_LED) || !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR4_LED) || \
+    !TOOL_MODE_LED_VALID(TOOL_SCENE_GEAR1_LED) || !TOOL_MODE_LED_VALID(TOOL_SCENE_GEAR2_LED) || \
+    !TOOL_MODE_LED_VALID(TOOL_SCENE_GEAR3_LED)
+#error "Mode LED numbers must be in the range 5..8."
+#endif
+#if !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR1_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR2_DUTY_PERCENT) || \
+    !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR3_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR4_DUTY_PERCENT) || \
+    !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR1_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR2_DUTY_PERCENT) || \
+    !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR3_DUTY_PERCENT)
+#error "Mode duty percentages must be in the range 15..100."
+#endif
+#undef TOOL_MODE_LED_VALID
+#undef TOOL_MODE_DUTY_VALID
 
 #define COM_50US_CNT_LOAD      		25
 
@@ -133,25 +174,25 @@
 #define IBus_Avg_REC_MS               (200) //ms
 #define IBus_Avg_REC_MS_CONUT         (u16)((float)IBus_Avg_REC_MS*SLOWLOOP_FRE/1000.0f) 
 
-#define IBus_Avg_OCP1                (65.0f)
+#define IBus_Avg_OCP1                (40.0f)
 #define IBus_Avg_OCP1_AdcValue         (u16)(IBus_Avg_OCP1*CURRENT_ADC_PER_A)
 
 #define IBus_Avg_OCP1_MS               (2000) //ms
 #define IBus_Avg_OCP1_MS_CONUT         (u16)((float)IBus_Avg_OCP1_MS*SLOWLOOP_FRE/1000.0f) 
 	
-#define IBus_Avg_OCP2                 (80.0f)
+#define IBus_Avg_OCP2                 (55.0f)
 #define IBus_Avg_OCP2_AdcValue         (u16)(IBus_Avg_OCP2*CURRENT_ADC_PER_A)
 
 #define IBus_Avg_OCP2_MS               (500) //ms
 #define IBus_Avg_OCP2_MS_CONUT        (u16)((float)IBus_Avg_OCP2_MS*SLOWLOOP_FRE/1000.0f) 
 
-#define IBus_Avg_OCP3                  (90.0f)
+#define IBus_Avg_OCP3                  (70.0f)
 #define IBus_Avg_OCP3_AdcValue         (u16)(IBus_Avg_OCP3*CURRENT_ADC_PER_A)
 
 #define IBus_Avg_OCP3_MS               (80) //ms
 #define IBus_Avg_OCP3_MS_CONUT        (u16)((float)IBus_Avg_OCP3_MS*SLOWLOOP_FRE/1000.0f)
 
-#define IBus_Avg_OCP4                  (100.0f)
+#define IBus_Avg_OCP4                  (80.0f)
 #define IBus_Avg_OCP4_AdcValue         (u16)(IBus_Avg_OCP4*CURRENT_ADC_PER_A)
 
 #define IBus_Avg_OCP4_MS               (5) //ms
@@ -170,21 +211,21 @@
 //此处堵转时间注意根据实际情况调整
 #define Block_Protect_RUNING_TIME                     (100*SLOWLOOP_1ms_CNT_LOAD)/*堵转时间unit:ms*/
 
-#define Block_Protect_Current1                      (60.00)/*unit:a*/
+#define Block_Protect_Current1                      (45.00)/*unit:a*/
 #define Block_Protect_Current1_AdcValue             (u16)(Block_Protect_Current1*CURRENT_ADC_PER_A)
 #define Block_Protect_Current1_TIME                 (80*SLOWLOOP_1ms_CNT_LOAD)/*堵转时间unit:ms*/
 
 
-#define Block_Protect_Current2                      (70.00)/*unit:a*/
+#define Block_Protect_Current2                      (55.00)/*unit:a*/
 #define Block_Protect_Current2_AdcValue             (u16)(Block_Protect_Current2*CURRENT_ADC_PER_A)
 #define Block_Protect_Current2_TIME                 (50*SLOWLOOP_1ms_CNT_LOAD)/*堵转时间unit:ms*/
 
 
-#define Block_Protect_Current3                      (80.00)/*unit:a*/
+#define Block_Protect_Current3                      (65.00)/*unit:a*/
 #define Block_Protect_Current3_AdcValue             (u16)(Block_Protect_Current3*CURRENT_ADC_PER_A)
 #define Block_Protect_Current3_TIME                 (30*SLOWLOOP_1ms_CNT_LOAD)/*堵转时间unit:ms*/
 
-#define Block_Protect_Current4                      (90.00)/*unit:a*/
+#define Block_Protect_Current4                      (80.00)/*unit:a*/
 #define Block_Protect_Current4_AdcValue             (u16)(Block_Protect_Current4*CURRENT_ADC_PER_A)
 #define Block_Protect_Current4_TIME                 (10*SLOWLOOP_1ms_CNT_LOAD)/*堵转时间unit:ms*/
 
@@ -207,17 +248,17 @@
 
 
 
-	#define IBus_Smart_Peak_OCP1                      (80.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP1                      (60.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP1_AdcValue             (u16)(IBus_Smart_Peak_OCP1*CURRENT_ADC_PER_A)
 	#define IBus_Smart_Peak_OCP1_MS                   (800) //ms
 	#define IBus_Smart_OCP1_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP1_MS*SLOWLOOP_FRE/1000.0f))
 
-	#define IBus_Smart_Peak_OCP2                      (90.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP2                      (70.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP2_AdcValue             (u16)(IBus_Smart_Peak_OCP2*CURRENT_ADC_PER_A)
 	#define IBus_Smart_Peak_OCP2_MS                   (100) //ms
 	#define IBus_Smart_OCP2_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP2_MS*SLOWLOOP_FRE/1000.0f))
 		
-	#define IBus_Smart_Peak_OCP3                      (100.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP3                      (80.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP3_AdcValue             (u16)(IBus_Smart_Peak_OCP3*CURRENT_ADC_PER_A)
 	#define IBus_Smart_Peak_OCP3_MS                   (10) //ms
 	#define IBus_Smart_OCP3_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP3_MS*SLOWLOOP_FRE/1000.0f))
@@ -248,14 +289,14 @@
 #endif
 
 
-#define IBus_Peak_IT_OCP               (150.0f)  //峰值保护，单次超过触发
+#define IBus_Peak_IT_OCP               (110.0f)  //峰值保护，单次超过触发
 #define IBus_Peak_IT_OCP_AdcValue      (u16)(IBus_Peak_IT_OCP*CURRENT_ADC_PER_A)
 #define IBus_Peak_IT_COUNT     				 (u16)(PWMFREQ/1000)//PWMFREQ/1000=1MS
 
 #define IBus_Peak_OCP_ONCE_EN              (1)
-#define IBus_Peak_OCP_ONCE               (150.0f)  //峰值保护，单次超过触发
+#define IBus_Peak_OCP_ONCE               (110.0f)  //峰值保护，单次超过触发
 #define IBus_Peak_OCP_ONCE_AdcValue      (u16)(IBus_Peak_OCP_ONCE*CURRENT_ADC_PER_A)
-#define IBus_IPD_OCP               (150.0f)  //峰值保护，单次超过触发
+#define IBus_IPD_OCP               (110.0f)  //峰值保护，单次超过触发
 #define IBus_IPD_OCP_AdcValue      (u16)(IBus_IPD_OCP*CURRENT_ADC_PER_A)
 
 

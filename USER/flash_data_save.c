@@ -2,7 +2,7 @@
 #include "user_control.h"
 #include "tool_mode.h"
 
-/* 中文：末两页为事务日志，工程ROM上限必须为30KB，禁止代码落入此区域。 */
+/* 末两页为事务日志，工程ROM上限必须为30KB，禁止代码落入此区域。 */
 #define FLASH_PAGE0_ADDRESS (0x08007800ul)
 #define FLASH_PAGE1_ADDRESS (0x08007c00ul)
 #define FLASH_PAGE_BYTES    (1024u)
@@ -14,7 +14,7 @@
 #define FLASH_LEGACY_MAGIC  (0x55aau)
 #define FLASH_LEGACY_SLOTS  (10u)
 
-/* 中文：新记录8半字：最后提交标志、版本、模式、调速档、情景档、序号低/高、CRC16。 */
+/* 新记录8半字：最后提交标志、版本、模式、调速档、情景档、序号低/高、CRC16。 */
 typedef struct
 {
 	uint32_t page;
@@ -25,18 +25,24 @@ typedef struct
 	uint8_t legacy_auto_stop;
 } flash_latest_t;
 
+/**
+ * @brief 从指定Flash地址读取一个半字。
+ */
 uint16_t read_half_data(uint32_t address)
 {
 	return *(volatile uint16_t *)address;
 }
 
+/**
+ * @brief 计算记录版本、模式、挡位及序号的CRC16-CCITT，不包含提交标志。
+ */
 static uint16_t flash_record_crc(const uint16_t *record)
 {
 	uint16_t crc=0xffffu;
 	uint8_t word;
 	uint8_t byte;
 	uint8_t bit;
-	/* 中文：CRC16-CCITT，按每半字低字节在先覆盖版本至32位序号，标志不参与。 */
+	/* CRC16-CCITT，按每半字低字节在先覆盖版本至32位序号，标志不参与。 */
 	for(word=1;word<7;word++)
 	{
 		for(byte=0;byte<2;byte++)
@@ -51,17 +57,23 @@ static uint16_t flash_record_crc(const uint16_t *record)
 	return crc;
 }
 
+/**
+ * @brief 读取并校验一条日志，只有提交标志、版本、范围和CRC均有效才返回1。
+ */
 static uint8_t flash_read_record(uint32_t address,uint16_t *record)
 {
 	uint8_t i;
 	if(read_half_data(address)!=FLASH_RECORD_MAGIC) return 0;
 	for(i=0;i<FLASH_RECORD_WORDS;i++) record[i]=read_half_data(address+2u*i);
-	/* 中文：CRC和范围同时检查，损坏/旧格式/未完成记录均不成为最新设置。 */
+	/* CRC和范围同时检查，损坏/旧格式/未完成记录均不成为最新设置。 */
 	return record[1]==FLASH_RECORD_VERSION && record[2]<=TOOL_MODE_SCENE &&
 		record[3]>=1 && record[3]<=4 && record[4]>=1 && record[4]<=3 &&
 		record[7]==flash_record_crc(record);
 }
 
+/**
+ * @brief 扫描双页事务日志获取最新记录，无新格式日志时兼容读取旧挡位记录。
+ */
 static void flash_find_latest(flash_latest_t *latest)
 {
 	uint32_t page;
@@ -83,7 +95,7 @@ static void flash_find_latest(flash_latest_t *latest)
 			address=page+(uint32_t)slot*FLASH_SLOT_BYTES;
 			if(!flash_read_record(address,record)) continue;
 			sequence=(uint32_t)record[5] | ((uint32_t)record[6]<<16);
-			/* 中文：无效槽不截断扫描；32位序号按差值处理自然回绕。 */
+			/* 无效槽不截断扫描；32位序号按差值处理自然回绕。 */
 			if(!latest->valid || (int32_t)(sequence-latest->sequence)>0)
 			{
 				latest->valid=1;
@@ -94,7 +106,7 @@ static void flash_find_latest(flash_latest_t *latest)
 		}
 	}
 	if(latest->valid) return;
-	/* 中文：仅无新日志时读取旧页31首10槽；旧0/1挡位转换为调速1/2，自动停机仍兼容读取。 */
+	/* 仅无新日志时读取旧页31首10槽；旧0/1挡位转换为调速1/2，自动停机仍兼容读取。 */
 	for(slot=0;slot<FLASH_LEGACY_SLOTS;slot++)
 	{
 		address=FLASH_PAGE1_ADDRESS+(uint32_t)slot*FLASH_SLOT_BYTES;
@@ -112,6 +124,9 @@ static void flash_find_latest(flash_latest_t *latest)
 	}
 }
 
+/**
+ * @brief 查找完整擦净的20字节日志槽，整页无空槽时返回0。
+ */
 static uint32_t flash_find_empty_slot(uint32_t page)
 {
 	uint8_t slot;
@@ -120,7 +135,7 @@ static uint32_t flash_find_empty_slot(uint32_t page)
 	for(slot=0;slot<FLASH_SLOT_COUNT;slot++)
 	{
 		address=page+(uint32_t)slot*FLASH_SLOT_BYTES;
-		/* 中文：整个20字节必须擦净，残缺记录不能再次编程，只跳过不覆盖。 */
+		/* 整个20字节必须擦净，残缺记录不能再次编程，只跳过不覆盖。 */
 		for(word=0;word<FLASH_SLOT_BYTES/2u;word++)
 		{
 			if(read_half_data(address+2u*word)!=0xffffu) break;
@@ -130,6 +145,10 @@ static uint32_t flash_find_empty_slot(uint32_t page)
 	return 0;
 }
 
+/**
+ * @brief 以双页事务日志保存模式和挡位，最后提交标志并读回校验；成功返回1。
+ *        调用者须确认电机完全停止，任意擦写或校验失败均保留上次有效记录。
+ */
 uint8_t save_user_data_checked(void)
 {
 	flash_latest_t latest;
@@ -142,7 +161,7 @@ uint8_t save_user_data_checked(void)
 	uint8_t i;
 	uint8_t result=0;
 	uint16_t erase_word;
-	/* 中文：拒绝无效RAM配置，失败不清待保存标志。调用者保证前台完全停机。 */
+	/* 拒绝无效RAM配置，失败不清待保存标志。调用者保证前台完全停机。 */
 	if(tool_mode_list.mode>TOOL_MODE_SCENE || tool_mode_list.speed_gear<1 ||
 	   tool_mode_list.speed_gear>4 || tool_mode_list.scene_gear<1 || tool_mode_list.scene_gear>3)
 	{
@@ -153,7 +172,7 @@ uint8_t save_user_data_checked(void)
 	address=flash_find_empty_slot(page);
 	if(address==0)
 	{
-		/* 中文：写满后仅擦另一页，最新有效页保留到新记录完整写入且读回成功。 */
+		/* 写满后仅擦另一页，最新有效页保留到新记录完整写入且读回成功。 */
 		if(latest.valid && !latest.legacy)
 		{
 			page=(latest.page==FLASH_PAGE0_ADDRESS) ? FLASH_PAGE1_ADDRESS : FLASH_PAGE0_ADDRESS;
@@ -175,13 +194,13 @@ uint8_t save_user_data_checked(void)
 	if(erase_needed)
 	{
 		if(FLASH_ErasePage(page)!=FLASH_COMPLETE) goto save_done;
-		/* 中文：擦页成功还须整页读回FFFF，避免残留旧magic使后续半写误成有效记录。 */
+		/* 擦页成功还须整页读回FFFF，避免残留旧magic使后续半写误成有效记录。 */
 		for(erase_word=0;erase_word<FLASH_PAGE_BYTES/2u;erase_word++)
 		{
 			if(read_half_data(page+2u*erase_word)!=0xffffu) goto save_done;
 		}
 	}
-	/* 中文：先写数据并逐半字读回；最后写magic提交，任何失败都留下可跳过的残缺槽。 */
+	/* 先写数据并逐半字读回；最后写magic提交，任何失败都留下可跳过的残缺槽。 */
 	for(i=1;i<FLASH_RECORD_WORDS;i++)
 	{
 		if(FLASH_ProgramHalfWord(address+2u*i,record[i])!=FLASH_COMPLETE ||
@@ -199,17 +218,23 @@ save_done:
 	return result;
 }
 
+/**
+ * @brief 兼容旧保存接口，标记待保存并通过同一前台停机门控提交。
+ */
 void save_user_data(void)
 {
-	/* 中文：保留旧调用接口，同样经停机门控；失败由待保存标志留待后续重试。 */
+	/* 保留旧调用接口，同样经停机门控；失败由待保存标志留待后续重试。 */
 	tool_mode_list.save_pending=1;
 	tool_mode_save_handle();
 }
 
+/**
+ * @brief 上电恢复最新有效模式和挡位，无有效记录时使用默认设置并避免写Flash。
+ */
 void read_user_data(void)
 {
 	flash_latest_t latest;
-	/* 中文：空页或全部损坏时采用默认，不在启动期间重写默认设置。 */
+	/* 空页或全部损坏时采用默认，不在启动期间重写默认设置。 */
 	tool_mode_init();
 	flash_find_latest(&latest);
 	if(latest.valid)

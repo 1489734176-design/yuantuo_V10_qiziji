@@ -53,7 +53,7 @@ def main():
         command += ['-I', str(ROOT / path)]
     subprocess.run(command, check=True, cwd=ROOT)
     failures = []
-    for scenario in range(6):
+    for scenario in range(9):
         try:
             execute(image, scenario)
         except AssertionError as error:
@@ -61,7 +61,7 @@ def main():
     if failures:
         raise AssertionError('; '.join(failures))
 
-def execute(image, boot_scenario=0):
+def execute(image, boot_scenario=0, source_name='test_seven_led.c'):
     import struct
     sys.path.insert(0, str(ROOT / '.tmp_protocol/test_deps'))
     from elftools.elf.elffile import ELFFile
@@ -91,15 +91,16 @@ def execute(image, boot_scenario=0):
     stop = 0x080f0000
     uc.reg_write(UC_ARM_REG_SP, 0x200ffff0)
     uc.reg_write(UC_ARM_REG_LR, stop | 1)
-    uc.emu_start(symbols['run_tests'] | 1, stop, timeout=30_000_000, count=40_000_000)
+    uc.emu_start(symbols['run_tests'] | 1, stop, timeout=30_000_000, count=80_000_000)
     assert uc.reg_read(UC_ARM_REG_PC) == stop, 'test did not return'
     def word(name):
         return struct.unpack('<I', uc.mem_read(symbols[name], 4))[0]
     line, case, checks = map(word, ['test_failure_line', 'test_case', 'test_checks'])
     if line:
-        raise AssertionError(f'case {case}, test_seven_led.c:{line}, after {checks} checks')
+        raise AssertionError(f'case {case}, {source_name}:{line}, after {checks} checks')
     label = ('SWD startup profile' if boot_scenario == 5 else
              f'SOC boot profile {boot_scenario}' if boot_scenario else f'{case} cases')
+    label = {6: 'battery 5s hold/repress', 7: 'release 15s sleep/wake', 8: 'fault 5s display/15s sleep'}.get(boot_scenario, label)
     print(f'PASS: {label}, {checks} checks (ARM C / simulated GPIO, not a bench test)')
 
 if __name__ == '__main__':

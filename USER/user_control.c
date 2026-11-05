@@ -100,7 +100,7 @@ void user_para_init(void)
 {
 	user_list.userErr.word=0;
 	user_list.user_state=TOOL_STOP;
-	/* 中文：双模式默认值先初始化，随后上电read_user_data恢复已提交设置。 */
+	/* 双模式默认值先初始化，随后上电read_user_data恢复已提交设置。 */
 	tool_mode_init();
 		user_list.flag.bits.gToolDir= Tool_Dir_Init;
 	/* 扳机为上电来源：首次稳定方向确认后允许本次扣动启动。 */
@@ -1703,7 +1703,7 @@ void user_gears_handle(void)
 		motor_control_list.pwm_duty_aim=(motor_control_list.pwm_duty_aim_per*PWM_DUTY_GEARS3)>>15;
 	}
 	#else 
-	/* 中文：调速重映射到本挡上限；情景采用固定目标，保留底层软启动及保护。 */
+	/* 调速重映射到本挡上限；情景采用固定目标，保留底层软启动及保护。 */
 	motor_control_list.pwm_duty_aim=tool_mode_duty(motor_control_list.pwm_duty_aim_per);
 	#endif
 }
@@ -2097,9 +2097,12 @@ void error_hold_updata(void)
  *        状态: TOOL_STOP -> TOOL_RUN -> TOOL_ERROR_STOP
  *              TOOL_STOP -> TOOL_POWER_DOWN(休眠)
  *        根据扳机、故障、自动停机标志进行状态切换
+ *        扳机按住时清零休眠计数，松手计满SLEEP_TIME后进入休眠。
  */
 void user_state_control(void)
 {
+	/* 扣动扳机清零15s待机计时；正常/故障/方向未就绪时长按均保持唤醒。 */
+	if(user_list.flag.bits.gToolTrigger) user_list.sleep_cnt=0;
 	/* 电池通信许可撤销时立即清工具使能，运行中则回到停止态 */
 	if(!Bat_Com_CanRun())
 	{
@@ -2114,7 +2117,7 @@ void user_state_control(void)
 		case TOOL_STOP:
 			user_list.flag.bits.gToolEn=0;
 			user_list.Load_exist=0;
-			if(++user_list.sleep_cnt>SLEEP_TIME)  // 休眠超时，进入低功耗
+			if(!user_list.flag.bits.gToolTrigger && ++user_list.sleep_cnt>=SLEEP_TIME)  // 休眠超时，进入低功耗
 			{
 				/* 休眠前先停用通信释放总线，随后 break 防止后续逻辑覆盖 POWER_DOWN */
 				Bat_Com_Sleep();
@@ -2152,7 +2155,7 @@ void user_state_control(void)
 		case TOOL_ERROR_STOP:
 			user_list.flag.bits.gToolEn=0;
 //			user_list.Load_exist=0;
-			if(++user_list.sleep_cnt>SLEEP_TIME)
+			if(!user_list.flag.bits.gToolTrigger && ++user_list.sleep_cnt>=SLEEP_TIME)
 			{
 				/* 报错停机下同样先停用通信再进入休眠，break 保护 POWER_DOWN 不被覆盖 */
 				Bat_Com_Sleep();
@@ -2229,7 +2232,7 @@ void user_state_control(void)
 		
 		case TOOL_POWER_DOWN:
 			user_list.sleep_cnt=0;
-			/* 中文：EN撤销前再执行同一停机保存门控，未停车或写失败时仍保留pending。 */
+			/* EN撤销前再执行同一停机保存门控，未停车或写失败时仍保留pending。 */
 			tool_mode_save_handle();
 			GPIO_ResetBits(EN_PORT, EN_PIN);  // 关闭电源使能（进入低功耗）
 			if(user_list.flag.bits.gToolTrigger)

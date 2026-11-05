@@ -92,7 +92,7 @@ def test_physical_k3_to_scene_display(image):
     assert board.state() == (0, 1, 1), 'K3 activated before three stable samples'
     assert board.key_ms(0x46, 1) == 1
     assert board.state() == (1, 1, 1), 'physical K3 did not enter SCENE'
-    board.display([0, 0x08, 0, 0])
+    board.display([0, 0x40, 0, 0])
     assert board.key_ms(0x46, 200) == 20
     assert board.state() == (1, 1, 1), 'holding K3 repeated the event'
     board.press(0x46)
@@ -100,10 +100,10 @@ def test_physical_k3_to_scene_display(image):
     board.display([0, 0x10, 0, 0])
     board.press(0x46)
     assert board.state() == (1, 1, 3)
-    board.display([0, 0x20, 0, 0])
+    board.display([0, 0x08, 0, 0])
     board.press(0x46)
     assert board.state() == (1, 1, 1)
-    board.display([0, 0x08, 0, 0])
+    board.display([0, 0x40, 0, 0])
 
 
 def test_physical_k2_speed_order_and_mode_memory(image):
@@ -115,7 +115,7 @@ def test_physical_k2_speed_order_and_mode_memory(image):
         board.display([mask, 0, 0, 0])
     board.press(0x46)
     assert board.state() == (1, 2, 1), 'switching modes changed remembered speed gear'
-    board.display([0, 0x08, 0, 0])
+    board.display([0, 0x40, 0, 0])
     board.press(0x46)
     assert board.state() == (1, 2, 2)
     board.display([0, 0x10, 0, 0])
@@ -127,10 +127,41 @@ def test_physical_k2_speed_order_and_mode_memory(image):
     assert board.state() == (0, 2, 2), 'power-down changed mode memory'
 
 
+def test_physical_keys_inhibited_by_trigger(image):
+    board = ModeBoard(image)
+    board.call('test_trigger', 1)
+    board.key_ms(0x46, 100)
+    assert board.state() == (0, 1, 1), 'K3 changed mode while trigger was pressed'
+    board.call('test_trigger', 0)
+    board.key_ms(0x46, 100)
+    assert board.state() == (0, 1, 1), 'held K3 replayed after trigger release'
+    board.press(0x46)
+    assert board.state() == (1, 1, 1)
+    board.display([0, 0x40, 0, 0])
+    board.call('test_trigger', 1)
+    board.key_ms(0x47, 100)
+    assert board.state() == (1, 1, 1), 'K2 changed mode while trigger was pressed'
+    board.call('test_trigger', 0)
+    board.key_ms(0x47, 100)
+    assert board.state() == (1, 1, 1), 'held K2 replayed after trigger release'
+    board.press(0x47)
+    assert board.state() == (0, 1, 1)
+    board.display([0x40, 0, 0, 0])
+    board.key_ms(0x47, 20)
+    board.call('test_trigger', 1)
+    board.key_ms(0x47, 1)
+    board.call('test_trigger', 0)
+    board.key_ms(0x47, 100)
+    assert board.state() == (0, 1, 1), 'partial key debounce survived a trigger press'
+    board.press(0x47)
+    assert board.state() == (0, 2, 1)
+
+
 def main():
     image = build()
     failures = []
-    for test in [test_physical_k3_to_scene_display, test_physical_k2_speed_order_and_mode_memory]:
+    for test in [test_physical_k3_to_scene_display, test_physical_k2_speed_order_and_mode_memory,
+                 test_physical_keys_inhibited_by_trigger]:
         try:
             test(image)
             print(f'PASS: {test.__name__}')
