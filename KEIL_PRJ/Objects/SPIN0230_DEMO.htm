@@ -3,7 +3,7 @@
 <title>Static Call Graph - [.\Objects\SPIN0230_DEMO.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image .\Objects\SPIN0230_DEMO.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6220000: Last Updated: Fri Nov  6 09:57:03 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6220000: Last Updated: Fri Nov  6 15:11:07 2026
 <BR><P>
 <H3>Maximum Stack Usage =        224 bytes + Unknown(Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -684,7 +684,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[5]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;SysTick_Handler
 </UL>
 
-<P><STRONG><a name="[76]"></a>CurrentOffsetCalibration</STRONG> (Thumb, 320 bytes, Stack size 32 bytes, motor_control.o(.text.CurrentOffsetCalibration))
+<P><STRONG><a name="[76]"></a>CurrentOffsetCalibration</STRONG> (Thumb, 500 bytes, Stack size 32 bytes, motor_control.o(.text.CurrentOffsetCalibration))
 <BR><BR>[Stack]<UL><LI>Max Depth = 176<LI>Call Chain = CurrentOffsetCalibration &rArr; Board_ADC_Init &rArr; Drv_Adc_Basic_Init &rArr; ADC_ExternalTrigSourceConfig
 </UL>
 <BR>[Calls]<UL><LI><a href="#[41]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ADC_GetFlagStatus
@@ -1602,7 +1602,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[a8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;UO_Led_Handler
 </UL>
 
-<P><STRONG><a name="[df]"></a>tool_mode_duty</STRONG> (Thumb, 552 bytes, Stack size 24 bytes, tool_mode.o(.text.tool_mode_duty))
+<P><STRONG><a name="[df]"></a>tool_mode_duty</STRONG> (Thumb, 564 bytes, Stack size 24 bytes, tool_mode.o(.text.tool_mode_duty))
 <BR><BR>[Stack]<UL><LI>Max Depth = 40<LI>Call Chain = tool_mode_duty &rArr; __aeabi_uidiv
 </UL>
 <BR>[Calls]<UL><LI><a href="#[e0]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_uidiv
@@ -1683,13 +1683,13 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[19]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[c7]"></a>user_oc_handle</STRONG> (Thumb, 496 bytes, Stack size 24 bytes, user_control.o(.text.user_oc_handle))
+<P><STRONG><a name="[c7]"></a>user_oc_handle</STRONG> (Thumb, 508 bytes, Stack size 24 bytes, user_control.o(.text.user_oc_handle))
 <BR><BR>[Stack]<UL><LI>Max Depth = 24<LI>Call Chain = user_oc_handle
 </UL>
 <BR>[Called By]<UL><LI><a href="#[19]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[ba]"></a>user_para_init</STRONG> (Thumb, 40 bytes, Stack size 16 bytes, user_control.o(.text.user_para_init))
+<P><STRONG><a name="[ba]"></a>user_para_init</STRONG> (Thumb, 48 bytes, Stack size 16 bytes, user_control.o(.text.user_para_init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 16<LI>Call Chain = user_para_init
 </UL>
 <BR>[Calls]<UL><LI><a href="#[d8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;tool_mode_init

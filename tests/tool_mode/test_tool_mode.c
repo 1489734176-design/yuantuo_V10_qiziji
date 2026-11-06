@@ -53,6 +53,8 @@ static void erase_fixture(void)
 }
 
 #if !TEST_BASELINE
+/* 库内部电机初始化由空硬件桩替代，应用mc_init和Flash恢复使用真实代码。 */
+void mc_core_list_init(const McCore_Param_t *p) { (void)p; }
 /** @brief 松扳机并停机后执行实际初始化及Flash恢复，建立各用例统一上电状态。 */
 static void boot_fixture(void)
 {
@@ -719,6 +721,9 @@ static void scene_load_fixture(void)
 	machine_error_hold.MC_error_hold.word=0;
 	mc_core_list.MC_error.word=0;
 	user_list.IBusAvg_Adc=0;
+	user_list.IBusAvgScene_Adc=0;
+	user_list.IBusAvgOffset_Adc=100;
+	user_list.IBusAvgOffsetValid=1;
 	tool_mode_key_event(0x46);
 	user_list.flag.bits.gToolTrigger=1;
 	user_list.flag.bits.gToolEn=1;
@@ -733,21 +738,21 @@ static void test_scene_load_thresholds(void)
 	scene_load_fixture();
 	tick_ms(100); CHECK(tool_mode_duty(281)==337);
 	/* 8.91891码/A，31码低于3.5A，32码达到；峰值电流不参与本档负载判断。 */
-	user_list.IBusAvg_Adc=31;
+	user_list.IBusAvgScene_Adc=31;
 	user_list.IBusPeak_Adc=2000;
 	tick_ms(1000); CHECK(tool_mode_duty(1874)==337);
-	user_list.IBusAvg_Adc=32;
+	user_list.IBusAvgScene_Adc=32;
 	CHECK(tool_mode_duty(281)==337);
 	tick_ms(19); CHECK(tool_mode_duty(281)==337);
 	tick_ms(1); CHECK(tool_mode_duty(281)==1874);
-	user_list.IBusAvg_Adc=18;
+	user_list.IBusAvgScene_Adc=18;
 	tick_ms(1000); CHECK(tool_mode_duty(281)==1874);
 	/* 17码低于2.0A；卸载持续确认后恢复原档目标，扳机仍然扣住。 */
-	user_list.IBusAvg_Adc=17;
+	user_list.IBusAvgScene_Adc=17;
 	CHECK(tool_mode_duty(281)==1874);
 	tick_ms(99); CHECK(tool_mode_duty(281)==1874);
 	tick_ms(1); CHECK(tool_mode_duty(1874)==337);
-	user_list.IBusAvg_Adc=12;
+	user_list.IBusAvgScene_Adc=12;
 	tick_ms(5000); CHECK(tool_mode_duty(281)==337);
 }
 
@@ -755,19 +760,19 @@ static void test_scene_load_thresholds(void)
 static void test_scene_load_debounce(void)
 {
 	uint16_t i;
-	scene_load_fixture(); user_list.IBusAvg_Adc=100;
+	scene_load_fixture(); user_list.IBusAvgScene_Adc=100;
 	tick_ms(99); CHECK(tool_mode_duty(281)==337);
 	tick_ms(1); CHECK(tool_mode_duty(281)==337);
 	for(i=0;i<1000;i++) CHECK(tool_mode_duty(281)==337);
 	tick_ms(19); CHECK(tool_mode_duty(281)==337);
-	user_list.IBusAvg_Adc=31; CHECK(tool_mode_duty(281)==337);
-	user_list.IBusAvg_Adc=32; CHECK(tool_mode_duty(281)==337);
+	user_list.IBusAvgScene_Adc=31; CHECK(tool_mode_duty(281)==337);
+	user_list.IBusAvgScene_Adc=32; CHECK(tool_mode_duty(281)==337);
 	tick_ms(19); CHECK(tool_mode_duty(281)==337);
 	tick_ms(1); CHECK(tool_mode_duty(281)==1874);
-	user_list.IBusAvg_Adc=12; CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvgScene_Adc=12; CHECK(tool_mode_duty(281)==1874);
 	tick_ms(99); CHECK(tool_mode_duty(281)==1874);
-	user_list.IBusAvg_Adc=18; CHECK(tool_mode_duty(281)==1874);
-	user_list.IBusAvg_Adc=12; CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvgScene_Adc=18; CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvgScene_Adc=12; CHECK(tool_mode_duty(281)==1874);
 	tick_ms(99); CHECK(tool_mode_duty(281)==1874);
 	tick_ms(1); CHECK(tool_mode_duty(281)==337);
 }
@@ -778,7 +783,7 @@ static void test_scene_load_reset(void)
 	uint8_t gate;
 	for(gate=0;gate<8;gate++)
 	{
-		scene_load_fixture(); user_list.IBusAvg_Adc=32;
+		scene_load_fixture(); user_list.IBusAvgScene_Adc=32;
 		tick_ms(100); (void)tool_mode_duty(281);
 		tick_ms(20); CHECK(tool_mode_duty(281)==1874);
 		if(gate==0) user_list.flag.bits.gToolTrigger=0;
@@ -804,7 +809,7 @@ static void test_scene_load_reset(void)
 /** @brief 验证升速仅用于正转情景1档，换模式/方向或换挡后清除旧状态。 */
 static void test_scene_load_mode_scope(void)
 {
-	scene_load_fixture(); user_list.IBusAvg_Adc=32;
+	scene_load_fixture(); user_list.IBusAvgScene_Adc=32;
 	tick_ms(100); (void)tool_mode_duty(281);
 	tick_ms(20); CHECK(tool_mode_duty(281)==1874);
 	user_list.flag.bits.gToolTrigger=0;
@@ -848,9 +853,96 @@ static void test_scene_load_calibrated_current(void)
 	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=99;
 	user_oc_handle(); CHECK(user_list.IBusAvg_Adc==0);
 }
+/** @brief 模拟CH4/CH5不同零点，验证5.5A负载使用AVG自身零偏并经过实际PWM软坡。 */
+static void test_scene_independent_avg_offset(void)
+{
+	uint16_t i,previous;
+	scene_load_fixture();
+	user_list.IBusAvgOffset_Adc=432;
+	user_list.IBusAvgOffsetValid=1;
+	user_list.Vcc_cal_gain=32768;
+	/* 峰值零偏451码为测试构造值，不代表本次实板CH5测量结果。 */
+	mc_core_list.CurrentOffset_ad_data=451;
+	mc_core_list.Board_ADC_DATA.u16I_Peak=463;
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=443;
+	user_oc_handle();
+	CHECK(user_list.IBusAvgScene_Adc==11);
+	CHECK(user_list.IBusAvg_Adc==0 && user_list.IBusPeak_Adc==12);
+	tick_ms(100); user_gears_handle();
+	CHECK(motor_control_list.pwm_duty_aim==337);
+	/* 49码约5.5A，错扣峰值零点仅30码；情景应升速，原保护读数保持原算法。 */
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=481;
+	user_oc_handle();
+	CHECK(user_list.IBusAvgScene_Adc==49 && user_list.IBusAvg_Adc==30);
+	user_gears_handle(); tick_ms(20); user_gears_handle();
+	CHECK(motor_control_list.pwm_duty_aim==1874);
+	motor_control_list.pwm_duty_virtual=337;
+	mc_core_list.pwm_actual_runing_data=337;
+	previous=337;
+	for(i=0;i<12000;i++)
+	{
+		pwm_set(); CHECK(last_pwm>=previous && last_pwm<=1874); previous=last_pwm;
+	}
+	CHECK(last_pwm==1874);
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=443;
+	user_oc_handle(); user_gears_handle(); tick_ms(100); user_gears_handle();
+	CHECK(motor_control_list.pwm_duty_aim==337);
+	for(i=0;i<12000;i++)
+	{
+		pwm_set(); CHECK(last_pwm<=previous && last_pwm>=337); previous=last_pwm;
+	}
+	CHECK(last_pwm==337 && user_list.IBusAvgOffset_Adc==432);
+}
+
+/** @brief 验证应用初始化清有效标志，模拟校准后Flash/电机初始化及换模式均不擦掉零偏。 */
+static void test_scene_avg_offset_lifetime(void)
+{
+	erase_fixture();
+	user_list.IBusAvgOffset_Adc=432;
+	user_list.IBusAvgScene_Adc=99;
+	user_list.IBusAvgOffsetValid=1;
+	user_para_init();
+	CHECK(!user_list.IBusAvgOffsetValid && user_list.IBusAvgOffset_Adc==0 && user_list.IBusAvgScene_Adc==0);
+	/* 模拟真实上电顺序：应用初始化→独立校准→读Flash→电机初始化。 */
+	user_list.IBusAvgOffset_Adc=432;
+	user_list.IBusAvgOffsetValid=1;
+	read_user_data(); mc_init();
+	CHECK(user_list.IBusAvgOffset_Adc==432 && user_list.IBusAvgOffsetValid);
+	tool_mode_set_direction(TOOL_DIRECTION_REVERSE);
+	tool_mode_set_direction(TOOL_DIRECTION_FORWARD);
+	CHECK(user_list.IBusAvgOffset_Adc==432 && user_list.IBusAvgOffsetValid);
+	scene_load_fixture();
+	user_list.IBusAvgOffsetValid=0;
+	user_list.IBusAvg_Adc=100;
+	user_list.IBusAvgScene_Adc=100;
+	tick_ms(100); CHECK(tool_mode_duty(281)==337);
+	tick_ms(20); CHECK(tool_mode_duty(281)==337);
+}
+/** @brief AVG独立校准无效时仍保留原28A峰值保护，不能被情景升速条件屏蔽。 */
+static void test_scene_avg_failure_preserves_peak_protection(void)
+{
+	uint16_t i;
+	scene_load_fixture();
+	user_list.IBusAvgOffsetValid=0;
+	user_list.IBusAvgOffset_Adc=432;
+	user_list.Vcc_cal_gain=32768;
+	mc_core_list.CurrentOffset_ad_data=451;
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=432;
+	/* 校准后250码约28.03A；原28A积分每次加327，第101次达到32768。 */
+	mc_core_list.Board_ADC_DATA.u16I_Peak=701;
+	for(i=0;i<100;i++)
+	{
+		user_oc_handle();
+		CHECK(!user_list.userErr.bits.gIBusPeakOCP1);
+		CHECK(tool_mode_duty(281)==337 && user_list.IBusAvgScene_Adc==0);
+	}
+	user_oc_handle();
+	CHECK(user_list.IBusPeak_Adc==250 && user_list.userErr.bits.gIBusPeakOCP1);
+	CHECK(tool_mode_duty(281)==337);
+}
 #endif
 
-/** @brief 运行模式、反转时序、Flash兼容、换向记忆及情景1档负载升速回归。 */
+/** @brief 运行模式、反转时序、Flash兼容、换向记忆及情景1档独立电流校准回归。 */
 void run_tests(void)
 {
 #if TEST_BASELINE
@@ -877,5 +969,7 @@ void run_tests(void)
 	RUN(24,test_speed_direction_transfer); RUN(25,test_speed_transfer_save); RUN(26,test_boot_speed_direction_restore);
 	RUN(27,test_scene_load_thresholds); RUN(28,test_scene_load_debounce); RUN(29,test_scene_load_reset);
 	RUN(30,test_scene_load_mode_scope); RUN(31,test_scene_load_calibrated_current);
+	RUN(32,test_scene_independent_avg_offset); RUN(33,test_scene_avg_offset_lifetime);
+	RUN(34,test_scene_avg_failure_preserves_peak_protection);
 #endif
 }

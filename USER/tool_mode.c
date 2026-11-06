@@ -278,18 +278,20 @@ static uint16_t tool_mode_reverse_scene_duty(void)
 }
 
 /**
- * @brief 正转情景1挡按平均电流确认负载升速，卸载后恢复正常目标，保持原PWM软坡。
+ * @brief 正转情景1挡用AVG自身零偏校准的电流确认负载，阈值沿用原过流宏写法。
+ *        卸载后恢复正常目标，升降保持原PWM软坡。
  */
 static uint16_t tool_mode_scene_load_duty(void)
 {
 	uint16_t normal=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*TOOL_SCENE_GEAR1_DUTY_PERCENT)/100u);
 	uint16_t boost=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT)/100u);
 	uint32_t now;
-	uint32_t confirm_ms;
+	uint32_t confirm_count;
 	uint8_t threshold_met;
 	/* 任一许可或保护条件失效都清除升速状态；实际停机仍由原保护及电机状态机处理。 */
 	if(!user_list.flag.bits.gToolTrigger || !user_list.flag.bits.gToolEn ||
 	   !mc_core_list.motor_en || motor_control_list.bldc_state!=MOTOR_RUN ||
+	   !user_list.IBusAvgOffsetValid ||
 	   user_list.userErr.word || mc_core_list.MC_error.word ||
 	   machine_error_hold.userErr_hold.word || machine_error_hold.MC_error_hold.word)
 	{
@@ -302,8 +304,8 @@ static uint16_t tool_mode_scene_load_duty(void)
 		scene_load_running=1;
 		scene_load_run_start=now;
 	}
-	/* 启动屏蔽只作用于本次运行开始，避免启动尖峰直接触发满占空比。 */
-	if((uint32_t)(now-scene_load_run_start)<TOOL_SCENE_GEAR1_STARTUP_MASK_MS)
+	/* 本工程慢循环为1000Hz，与1ms中断时钟一致；启动屏蔽仅作用于本次运行开始。 */
+	if((uint32_t)(now-scene_load_run_start)<TOOL_SCENE_GEAR1_STARTUP_MASK_MS_CONUT)
 	{
 		scene_load_pending=0;
 		return normal;
@@ -311,13 +313,13 @@ static uint16_t tool_mode_scene_load_duty(void)
 	/* 使用扣零偏及VCC校准后的平均电流；独立升降阈值形成迟滞。 */
 	if(scene_load_boost)
 	{
-		threshold_met=user_list.IBusAvg_Adc<=TOOL_SCENE_GEAR1_LOAD_OFF_ADC;
-		confirm_ms=TOOL_SCENE_GEAR1_LOAD_OFF_MS;
+		threshold_met=user_list.IBusAvgScene_Adc<=TOOL_SCENE_GEAR1_LOAD_OFF_AdcValue;
+		confirm_count=TOOL_SCENE_GEAR1_LOAD_OFF_MS_CONUT;
 	}
 	else
 	{
-		threshold_met=user_list.IBusAvg_Adc>=TOOL_SCENE_GEAR1_LOAD_ON_ADC;
-		confirm_ms=TOOL_SCENE_GEAR1_LOAD_ON_MS;
+		threshold_met=user_list.IBusAvgScene_Adc>TOOL_SCENE_GEAR1_LOAD_ON_AdcValue;
+		confirm_count=TOOL_SCENE_GEAR1_LOAD_ON_MS_CONUT;
 	}
 	if(!threshold_met)
 	{
@@ -328,7 +330,7 @@ static uint16_t tool_mode_scene_load_duty(void)
 		scene_load_pending=1;
 		scene_load_confirm_start=now;
 	}
-	else if((uint32_t)(now-scene_load_confirm_start)>=confirm_ms)
+	else if((uint32_t)(now-scene_load_confirm_start)>=confirm_count)
 	{
 		scene_load_boost=!scene_load_boost;
 		scene_load_pending=0;

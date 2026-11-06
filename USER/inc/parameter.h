@@ -48,19 +48,21 @@
 #define TOOL_SCENE_GEAR1_DUTY_PERCENT (18u) // 正转情景1挡空载/卸载后的正常目标，单位%
 #define TOOL_SCENE_GEAR2_DUTY_PERCENT (100u) // 情景2挡固定目标，单位%
 #define TOOL_SCENE_GEAR3_DUTY_PERCENT (100u) // 情景3挡固定目标，单位%
+
 #define TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT (100u) // 正转情景1挡确认负载后的目标，单位%
-#define TOOL_SCENE_GEAR1_LOAD_ON_MA         (3500u) // 校准平均电流达到3.5A，开始负载确认
-#define TOOL_SCENE_GEAR1_LOAD_OFF_MA        (2000u) // 样机空载约1.3A，降至2.0A及以下开始卸载确认
+#define TOOL_SCENE_GEAR1_LOAD_ON           (3.5f)  // 负载升速电流，单位A
+#define TOOL_SCENE_GEAR1_LOAD_ON_AdcValue   (u16)(TOOL_SCENE_GEAR1_LOAD_ON*CURRENT_ADC_PER_A)
+#define TOOL_SCENE_GEAR1_LOAD_OFF          (2.0f)  // 样机空载约1.3A，卸载恢复阈值，单位A
+#define TOOL_SCENE_GEAR1_LOAD_OFF_AdcValue  (u16)(TOOL_SCENE_GEAR1_LOAD_OFF*CURRENT_ADC_PER_A)
 #define TOOL_SCENE_GEAR1_STARTUP_MASK_MS    (100u)  // 进入正常运行后屏蔽启动电流，单位ms
+#define TOOL_SCENE_GEAR1_STARTUP_MASK_MS_CONUT (u16)((float)TOOL_SCENE_GEAR1_STARTUP_MASK_MS*SLOWLOOP_FRE/1000.0f)
 #define TOOL_SCENE_GEAR1_LOAD_ON_MS         (20u)   // 连续达到负载阈值的确认时间，单位ms
+#define TOOL_SCENE_GEAR1_LOAD_ON_MS_CONUT   (u16)((float)TOOL_SCENE_GEAR1_LOAD_ON_MS*SLOWLOOP_FRE/1000.0f)
 #define TOOL_SCENE_GEAR1_LOAD_OFF_MS        (100u)  // 连续达到卸载阈值的确认时间，单位ms
-/* 自动换算为校准后的ADC码：负载向上取整，卸载向下取整，默认分别为32码和17码。 */
-#define TOOL_SCENE_GEAR1_LOAD_ON_ADC \
-    ((uint16_t)(TOOL_SCENE_GEAR1_LOAD_ON_MA*CURRENT_ADC_PER_A/1000.0f)+ \
-    ((TOOL_SCENE_GEAR1_LOAD_ON_MA*CURRENT_ADC_PER_A/1000.0f)> \
-    (uint16_t)(TOOL_SCENE_GEAR1_LOAD_ON_MA*CURRENT_ADC_PER_A/1000.0f) ? 1u : 0u))
-#define TOOL_SCENE_GEAR1_LOAD_OFF_ADC \
-    ((uint16_t)(TOOL_SCENE_GEAR1_LOAD_OFF_MA*CURRENT_ADC_PER_A/1000.0f))
+#define TOOL_SCENE_GEAR1_LOAD_OFF_MS_CONUT  (u16)((float)TOOL_SCENE_GEAR1_LOAD_OFF_MS*SLOWLOOP_FRE/1000.0f)
+
+/* 电流宏与原IBus_Avg_OCP保持同一写法；需保持0 < 卸载电流 < 升速电流。
+ * 默认ADC门限为31/17码；升速使用 > 门限，与原平均过流判定一致。 */
 #define TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT (100u) // 反转情景升速目标，单位%
 #define TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT  (15u)  // 反转情景降速后目标，单位%
 #define TOOL_REVERSE_SCENE_FULL_TIME_MS      (850u) // 达到升速目标后的保持时间，单位ms
@@ -87,10 +89,8 @@
     TOOL_REVERSE_SCENE_FULL_TIME_MS<1 || TOOL_REVERSE_SCENE_FULL_TIME_MS>60000
 #error "Reverse scene requires low duty <= full duty and a hold time in 1..60000 ms."
 #endif
-#if TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT<TOOL_SCENE_GEAR1_DUTY_PERCENT || \
-    TOOL_SCENE_GEAR1_LOAD_OFF_MA<1 || TOOL_SCENE_GEAR1_LOAD_OFF_MA>=TOOL_SCENE_GEAR1_LOAD_ON_MA || \
-    TOOL_SCENE_GEAR1_LOAD_ON_MA>100000
-#error "Scene gear 1 requires boost >= normal duty and 0 < off < on <= 100000 mA."
+#if TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT<TOOL_SCENE_GEAR1_DUTY_PERCENT
+#error "Scene gear 1 requires boost duty >= normal duty."
 #endif
 #if TOOL_SCENE_GEAR1_STARTUP_MASK_MS>60000 || \
     TOOL_SCENE_GEAR1_LOAD_ON_MS<1 || TOOL_SCENE_GEAR1_LOAD_ON_MS>60000 || \
@@ -283,19 +283,19 @@
 
 
 
-	#define IBus_Smart_Peak_OCP1                      (28.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP1                      (25.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP1_AdcValue             (u16)(IBus_Smart_Peak_OCP1*CURRENT_ADC_PER_A)
-	#define IBus_Smart_Peak_OCP1_MS                   (100) //ms
+	#define IBus_Smart_Peak_OCP1_MS                   (120) //ms
 	#define IBus_Smart_OCP1_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP1_MS*SLOWLOOP_FRE/1000.0f))
 
-	#define IBus_Smart_Peak_OCP2                      (70.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP2                      (30.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP2_AdcValue             (u16)(IBus_Smart_Peak_OCP2*CURRENT_ADC_PER_A)
-	#define IBus_Smart_Peak_OCP2_MS                   (100) //ms
+	#define IBus_Smart_Peak_OCP2_MS                   (50) //ms
 	#define IBus_Smart_OCP2_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP2_MS*SLOWLOOP_FRE/1000.0f))
 		
-	#define IBus_Smart_Peak_OCP3                      (80.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP3                      (40.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP3_AdcValue             (u16)(IBus_Smart_Peak_OCP3*CURRENT_ADC_PER_A)
-	#define IBus_Smart_Peak_OCP3_MS                   (10) //ms
+	#define IBus_Smart_Peak_OCP3_MS                   (20) //ms
 	#define IBus_Smart_OCP3_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP3_MS*SLOWLOOP_FRE/1000.0f))
 	
 	#define IBus_Smart_REC_MS                         80

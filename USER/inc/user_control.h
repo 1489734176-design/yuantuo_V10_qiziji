@@ -109,6 +109,9 @@ typedef struct
 	uint8_t		direction_initialized; // 首次上电方向已确认，与运行换向锁定分开
 	uint8_t		dir_valid;        // 方向已稳定确认，单线DIRCTION输入
 	uint8_t		dir_retrig_need;  // 需重新扣动电位器才能启动：松开电位器后清除
+	uint16_t	IBusAvgOffset_Adc; // AVG通道上电静止零偏，只用于情景负载检测
+	uint16_t	IBusAvgScene_Adc;  // AVG扣除自身零偏并校准后的情景负载电流
+	uint8_t		IBusAvgOffsetValid; // AVG独立零偏已完成校准，模式恢复不清除此标志
 } User_list_Struct;
 
 //故障锁存

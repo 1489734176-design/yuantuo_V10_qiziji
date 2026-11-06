@@ -37,7 +37,8 @@ static void prepare_forward_scene1(uint16_t current_adc)
 	user_list.user_state=TOOL_RUN;
 	user_list.flag.bits.gToolTrigger=1;
 	user_list.flag.bits.gToolEn=1;
-	user_list.IBusAvg_Adc=current_adc;
+	user_list.IBusAvgScene_Adc=current_adc;
+	user_list.IBusAvgOffsetValid=1;
 	mc_core_list.motor_en=1;
 	motor_control_list.bldc_state=MOTOR_RUN;
 }
@@ -139,24 +140,24 @@ uint32_t run_tests(void)
 	prepare_forward_scene1(load_on_adc-1);
 	CHECK(tool_mode_duty(281)==scene_duty[0]);
 	for(elapsed=0;elapsed<startup_ms+load_on_ms+3;elapsed++) CHECK(tick_mode_duty()==scene_duty[0]);
-	user_list.IBusAvg_Adc=load_on_adc;
+	user_list.IBusAvgScene_Adc=load_on_adc;
 	CHECK(tool_mode_duty(281)==scene_duty[0]);
 	for(elapsed=1;elapsed<load_on_ms;elapsed++) CHECK(tick_mode_duty()==scene_duty[0]);
 	CHECK(tick_mode_duty()==scene1_boost);
 
 	/* 卸载边界独立确认：退出门限多一码仍保持升速，等于向下取整门限才计时恢复。 */
 	test_case=11;
-	user_list.IBusAvg_Adc=load_off_adc+1;
+	user_list.IBusAvgScene_Adc=load_off_adc+1;
 	CHECK(tool_mode_duty(281)==scene1_boost);
 	for(elapsed=0;elapsed<load_off_ms+3;elapsed++) CHECK(tick_mode_duty()==scene1_boost);
-	user_list.IBusAvg_Adc=load_off_adc;
+	user_list.IBusAvgScene_Adc=load_off_adc;
 	CHECK(tool_mode_duty(281)==scene1_boost);
 	for(elapsed=1;elapsed<load_off_ms;elapsed++) CHECK(tick_mode_duty()==scene1_boost);
 	CHECK(tick_mode_duty()==scene_duty[0]);
 
 	/* 扳机仍扣住时再次加载，只重新执行负载确认，不能重新套用启动屏蔽。 */
 	test_case=12;
-	user_list.IBusAvg_Adc=load_on_adc;
+	user_list.IBusAvgScene_Adc=load_on_adc;
 	CHECK(tool_mode_duty(281)==scene_duty[0]);
 	for(elapsed=1;elapsed<load_on_ms;elapsed++) CHECK(tick_mode_duty()==scene_duty[0]);
 	CHECK(tick_mode_duty()==scene1_boost);

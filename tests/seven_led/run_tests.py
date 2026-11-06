@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-06-scene-load-alarm/board-tests'
+OUT = ROOT / '.planning/2026-11-06-scene-current-check/board-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)

@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-06-scene-load-alarm/control-tests'
+OUT = ROOT / '.planning/2026-11-06-scene-current-check/control-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)
@@ -49,6 +49,7 @@ def main():
         code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void user_direction_handle(void)'))
         code.append(extract_last_function(ROOT / 'USER/user_control.c', 'void user_oc_handle(void)'))
         code.append(runner.extract_function(ROOT / 'MOTOR_CONTROL/motor_control.c', 'void pwm_set(void)'))
+        code.append(runner.extract_function(ROOT / 'MOTOR_CONTROL/motor_control.c', 'void mc_init(void)'))
     code += ['#define TEST_BASELINE ' + str(int(args.baseline)),
              '#define TEST_ONLY_CASE ' + str(args.case),
              '#include "' + (ROOT / 'tests/tool_mode/test_tool_mode.c').as_posix() + '"']

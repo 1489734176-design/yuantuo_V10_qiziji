@@ -95,11 +95,16 @@ void Vcc_5V_CAL(void)
 /**
  * @brief  用户参数初始化
  *        清零错误状态，初始化状态机为停止状态，设置初始方向
+ *        清除情景专用AVG零偏，随后由本次上电静止校准重新建立
  */
 void user_para_init(void)
 {
 	user_list.userErr.word=0;
 	user_list.user_state=TOOL_STOP;
+	/* 仅整机初始化清除AVG校准，后续模式/Flash恢复保留本次上电测得的零偏。 */
+	user_list.IBusAvgOffset_Adc=0;
+	user_list.IBusAvgScene_Adc=0;
+	user_list.IBusAvgOffsetValid=0;
 	/* 双模式默认值先初始化，随后上电read_user_data恢复已提交设置。 */
 	tool_mode_init();
 		user_list.flag.bits.gToolDir= Tool_Dir_Init;
@@ -673,6 +678,9 @@ void User_Temperature_Handler(void)
 }
 
 #else // 使用user_function.c中的简化版过流保护
+/**
+ * @brief 更新原平均/峰值过流保护，并独立计算情景负载电流，后者使用AVG自身零偏。
+ */
 void user_oc_handle(void)
 {
 		static u16 IBusAvgOCP1_count=0;
@@ -688,6 +696,16 @@ void user_oc_handle(void)
 	#endif
 	u16  ibus_temp=0;
 	u16  ipeak_temp=0;
+	u16 avg_scene_raw=mc_core_list.Board_ADC_DATA.u16I_SUM_Avg;
+	/* 情景低电流判断使用AVG自己的静止零偏；原过流保护继续保留下面的既有计算。 */
+	if(user_list.IBusAvgOffsetValid && avg_scene_raw>user_list.IBusAvgOffset_Adc)
+	{
+		user_list.IBusAvgScene_Adc=(u16)(((u32)(avg_scene_raw-user_list.IBusAvgOffset_Adc)*user_list.Vcc_cal_gain)>>15);
+	}
+	else
+	{
+		user_list.IBusAvgScene_Adc=0;
+	}
 	   
 		
 		if(mc_core_list.Board_ADC_DATA.u16I_SUM_Avg>mc_core_list.CurrentOffset_ad_data)
@@ -1710,20 +1728,28 @@ void user_gears_handle(void)
 	#endif
 }
 /**
- * @brief  电动扳手按键处理
- *        正转时切换挡位(0/1/2)，反转时切换自动停机功能
- *        根据挡位计算目标占空比，并处理自动停机逻辑（反转电流低于阈值时停机）
+ * @brief  旧版电动扳手的按键、目标占空比及反转自动停机处理
+ *        依次完成：扫描按键 -> 修改挡位/自动停机开关 -> 计算目标占空比 -> 判断卸载停机。
+ * @note   main.c 仅在 Wrench_EN=1 时于前台1ms任务中调用本函数；当前 Wrench_EN=0，
+ *         实际使用 user_gears_handle()/tool_mode_duty() 实现四挡调速和情景模式。
+ *         本函数的旧三挡、反转卸载停机逻辑，与情景一挡3.5A升占空比逻辑相互独立。
+ * @note   以下时间按正常每1ms调用一次说明；计数器本身累计的是调用次数。
  */
 void user_WrenchKey_Handler(void)
 {
-//	gears_deal();//ɨ�赵λ
-	uint16_t pwm_duty_aim_temp=0;
-	static uint16_t auto_current_ad=0;
-	static uint16_t auto_stop_time=0;
-	u8 res=0;
+//	gears_deal();  // 旧挡位扫描接口已停用，下面使用key_scan()获取按键事件。
+	uint16_t pwm_duty_aim_temp=0;  /* 本次计算的PWM目标计数值，PWM_PRIOD_LOAD表示100%。 */
+	static uint16_t auto_current_ad=0;  /* 反转自动停机的平均电流ADC阈值，跨调用保留。 */
+	static uint16_t auto_stop_time=0;  /* 低电流累计计数：低于阈值加1，恢复后减1。 */
+	u8 res=0;  /* 按键事件：0无事件，1短按，2长按；本函数对1和2执行相同动作。 */
+	/* 1. 扫描旧按键：有效采样下按住51～999次后松开产生短按，按住第1000次产生长按。
+	 * 长按继续保持不会重复触发，长按后松开也不会再产生短按；采样无效会清按键计数。
+	 * 扫描在下面的电机状态判断之前，因此被运行状态屏蔽的事件不会排队留到停机后处理。 */
 	res=key_scan();
+	/* 闭环运行、运动检测和初始位置检测阶段禁止修改设置；其余电机状态才允许处理按键事件。 */
 	if(motor_control_list.bldc_state!=MOTOR_RUN&&motor_control_list.bldc_state!=MOTOR_MOTION&&motor_control_list.bldc_state!=MOTOR_POSITION)
 	{
+			/* 正转：旧版三挡使用下标0、1、2，每次有效按键循环加一挡。 */
 			if(user_list.flag.bits.gToolDir==Tool_Dir_CW_Value)
 			{
 				if(res)
@@ -1734,75 +1760,35 @@ void user_WrenchKey_Handler(void)
 					
 						user_list.gears_level=0;
 					}
+					/* 调用兼容保存接口；当前接口保存的是tool_mode_list配置，
+					 * 并不会直接把此处的旧gears_level写入Flash。 */
 					save_user_data();
 				}
 			}
 			else 
 			{
-//				if(res)
-//				{
-//					user_list.gears_ccw_level++;
-//					if(user_list.gears_ccw_level>3)
-//					{
-//					
-//						user_list.gears_ccw_level=0;
-//					}
-//					save_user_data();
-//				}
+				/* 反转：有效按键只翻转自动停机使能，不切换正转三挡。 */
 				if(res)
 				{
 						user_list.flag.bits.gAutoStopEn=!user_list.flag.bits.gAutoStopEn;
+						/* 当前Flash记录格式不保存旧gAutoStopEn，此调用仅请求保存模式配置。 */
 					save_user_data();
 				}
 			
 			}
 	}
 	
+	/* 2. 根据方向和设置计算PWM目标；本段每次调用都执行，不依赖本次是否有按键。 */
 	if(user_list.flag.bits.gToolDir==Tool_Dir_CCW_Value)
 	{
-//		if(user_list.gears_ccw_level==0)
-//		{
-//			user_list.flag.bits.gAutoStopEn=1;
-//		}
-//		else 
-//		{
-//			user_list.flag.bits.gAutoStopEn=0;
-//		}
 			if(user_list.flag.bits.gAutoStopEn)
 			{
+				/* 反转自动停机开启：目标直接设为100%，实际PWM仍由底层斜坡和保护处理。 */
 				pwm_duty_aim_temp=PWM_PRIOD_LOAD;
 			}
 			else 
-			{
-				
-//				if(motor_control_list.pwm_duty_aim_per<((u16)(0.3f*PWM_PRIOD_LOAD)))
-//				{
-//					motor_control_list.pwm_duty_aim_per=((u16)(0.3f*PWM_PRIOD_LOAD));
-//				}
-			//	motor_control_list.pwm_duty_aim=motor_control_list.pwm_duty_aim_per;
-
-//					if(user_list.gears_ccw_level==0)
-//					{
-//						pwm_duty_aim_temp=PWM_PRIOD_LOAD;
-//					}
-//					else if(user_list.gears_ccw_level==1)
-//					{
-//						pwm_duty_aim_temp=(motor_control_list.pwm_duty_aim_per*PWM_DUTY_GEARS2)>>15;
-//					}
-//					else if(user_list.gears_ccw_level==2)
-//					{
-//						pwm_duty_aim_temp=(motor_control_list.pwm_duty_aim_per*PWM_DUTY_GEARS3)>>15;
-//					}
-//					else 
-//					{
-//					
-//						pwm_duty_aim_temp=(motor_control_list.pwm_duty_aim_per*PWM_DUTY_GEARS4)>>15;
-//					}
-//					if(pwm_duty_aim_temp<((u16)(PWM_PRIOD_LOAD*0.50f)))
-//					{
-//						pwm_duty_aim_temp=((u16)(PWM_PRIOD_LOAD*0.50f));
-//					}
-				
+			{		
+				/* 反转自动停机关闭：沿用前一步由扳机输入换算出的PWM目标。 */
 				pwm_duty_aim_temp=motor_control_list.pwm_duty_aim_per;
 				
 			}
@@ -1812,6 +1798,8 @@ void user_WrenchKey_Handler(void)
 	{
 	
 		
+		/* 正转三挡按比例缩放扳机目标。宏采用Q15定点数：32768代表1，右移15位即除32768。
+		 * 当前三挡系数分别为0.50、0.80、1.00；这里的0/1/2是旧挡位下标。 */
 		if(user_list.gears_level==0)
 		{
 			pwm_duty_aim_temp=(motor_control_list.pwm_duty_aim_per*PWM_DUTY_GEARS1)>>15;
@@ -1827,6 +1815,7 @@ void user_WrenchKey_Handler(void)
 		}
 		
 		
+		/* 正转统一限幅，当前上限为96%；扳机给满时三挡目标分别为50%、80%、96%。 */
 		if(pwm_duty_aim_temp>Wrench_CW_MAX_DUTY)
 		{
 			pwm_duty_aim_temp=(Wrench_CW_MAX_DUTY);
@@ -1834,9 +1823,12 @@ void user_WrenchKey_Handler(void)
 
 	}
 	
+		/* 3. 提交目标占空比。Load_exist是旧堵转重启流程的累计记录，不是实时电流判据；
+		 * 当前RESTAR_EN=0，正常流程不会通过堵转重启累加它。 */
 		#if(1)
 		if(user_list.Load_exist)
 		{
+			/* #if 0 内的旧转速PI补偿整段不参与编译；实际执行的是其后的最低目标限制。 */
 			#if 0
 				if(motor_control_list.motor_run_count<(180*SLOWLOOP_1ms_CNT_LOAD))
 				
@@ -1895,6 +1887,7 @@ void user_WrenchKey_Handler(void)
 						motor_control_list.pwm_duty_aim=pwm_duty_aim_temp;
 					}
 					#endif
+					/* 已有堵转重启记录时，PWM目标至少为RESTAR_MIN_PWM_AIM_DUTY（当前50%）。 */
 					if(pwm_duty_aim_temp<RESTAR_MIN_PWM_AIM_DUTY)
 					{
 						motor_control_list.pwm_duty_aim=RESTAR_MIN_PWM_AIM_DUTY;
@@ -1908,42 +1901,45 @@ void user_WrenchKey_Handler(void)
 		}
 		else 
 		{
+			/* 没有堵转重启记录，直接提交前面计算的目标；此处不直接写PWM硬件。 */
 			motor_control_list.pwm_duty_aim=pwm_duty_aim_temp;
 		}
 	#else
 	
+	/* 上面的#if(1)已选择带重启保底的分支，此备用直接赋值分支不参与编译。 */
 	motor_control_list.pwm_duty_aim=pwm_duty_aim_temp;
 	#endif
 	
+	/* 4. 反转卸载自动停机：必须同时满足开关已开启、方向为反转、工具处于TOOL_RUN。
+	 * 这里使用原IBusAvg_Adc；情景一挡升占空比使用的IBusAvgScene_Adc不在本函数中判断。 */
 	if(user_list.flag.bits.gAutoStopEn&&user_list.flag.bits.gToolDir==Tool_Dir_CCW_Value&&user_list.user_state==TOOL_RUN)
 	{
+				/* 累计本轮运行时间，并限制最大值，避免16位计数器回绕后重新进入启动屏蔽期。 */
 				if(user_list.CCW_Auto_Mask_count<63334)
 				{
 					user_list.CCW_Auto_Mask_count++;
 				}
+				/* 启动屏蔽计数恰好达到150时，只采一次当前平均电流作为本轮阈值基准。 */
 				if(user_list.CCW_Auto_Mask_count==CCW_AUTO_STOP_START_MASK_COUNT)
 				{
 					auto_current_ad=user_list.IBusAvg_Adc;
 					auto_current_ad=((((u32)auto_current_ad)*((u32)21299))>>15);  // 计算自动停机电流阈值（约乘以0.65）
-//					if(auto_current_ad>CCW_AUTO_STOP_CURRENT_2_AdcValue)
-//					{
-//						auto_current_ad=(auto_current_ad-CCW_AUTO_STOP_CURRENT_2_AdcValue);
-//					}
-//					else 
-//					{
-//						auto_current_ad=0;
-//					}
+
+					/* 阈值下限为CCW_AUTO_STOP_CURRENT对应ADC值，当前配置18A。 */
 					if(auto_current_ad<CCW_AUTO_STOP_CURRENT_AdcValue)
 					{
 						auto_current_ad=CCW_AUTO_STOP_CURRENT_AdcValue;
 					}
 					
+					/* 阈值上限为CCW_AUTO_STOP_CURRENT_3对应ADC值，当前配置24A。
+					 * 即本轮阈值=启动屏蔽结束时电流的65%，再限制到18A～24A对应范围。 */
 					if(auto_current_ad>CCW_AUTO_STOP_CURRENT_3_AdcValue)
 					{
 						auto_current_ad=CCW_AUTO_STOP_CURRENT_3_AdcValue;
 					}
 				
 				}
+				/* #if 0 为旧电角扇区计数方案；当前实际使用#else中的1ms调用累计计数。 */
 				#if 0
 				if(user_list.IBusAvg_Adc < auto_current_ad&&user_list.CCW_Auto_Mask_count>CCW_AUTO_STOP_START_MASK_COUNT)
 				{						
@@ -1960,21 +1956,30 @@ void user_WrenchKey_Handler(void)
 								mc_core_list.Run_SectorCnt = 0;
 				}
 				#else 
+				/* 计数大于150后才允许卸载判断，启动屏蔽期间不累计低电流次数。 */
 				if(user_list.CCW_Auto_Mask_count>CCW_AUTO_STOP_START_MASK_COUNT)
 				{
 				
+					/* 平均电流低于本轮阈值，认为可能已经卸载，累计一次。 */
 					if(user_list.IBusAvg_Adc < auto_current_ad)
 					{
 						auto_stop_time++;
+						/* 宏名虽含Sector，当前比较的是调用次数；配置60，条件为>60。
+						 * 从0开始一直低于阈值时需61次（约61ms），不是60个电角扇区。 */
 						if(auto_stop_time > AUTO_STOP_Sector_CNT) //
 						{
+								/* 仅提出自动停机请求；user_state_control()会清运行使能并转TOOL_STOP。
+								 * 该标志由停止态在扳机松开后清除，按住扳机不会自动再启动。 */
 								user_list.flag.bits.gAutoStop = 1;
+								/* 清本地累计及旧扇区计数；启动屏蔽计数在退出运行条件后清零。 */
 								auto_stop_time=0;
 								mc_core_list.Run_SectorCnt = 0;	
 						}	
 					}
 					else 
 					{
+						/* 电流恢复到阈值或以上时只减1，不立即清零，所以这是可增减的累计滤波，
+						 * 并不要求电流严格连续低于阈值61ms；先判断非0，防止无符号数下溢。 */
 						if(auto_stop_time)
 						{
 							auto_stop_time--;
@@ -1985,6 +1990,7 @@ void user_WrenchKey_Handler(void)
 				else 
 				{
 				
+					/* 尚在启动屏蔽期（包括采样阈值的第150次），清除低电流累计。 */
 					auto_stop_time=0;
 				}
 				
@@ -1993,6 +1999,8 @@ void user_WrenchKey_Handler(void)
 	}
 	else 
 	{
+			/* 关闭自动停机、切到正转或工具退出运行时，清除本轮计时与旧扇区计数。
+			 * auto_current_ad保留旧值，但下一轮在屏蔽期结束时会重新采样；此处不清gAutoStop。 */
 			auto_stop_time=0;
 			mc_core_list.Run_SectorCnt = 0;	
 			user_list.CCW_Auto_Mask_count=0;
