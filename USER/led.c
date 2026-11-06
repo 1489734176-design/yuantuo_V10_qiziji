@@ -84,8 +84,8 @@ void LED_Scan(void)
 }
 
 /**
- * @brief 每1ms更新电量/故障显示和当前挡位灯；电量显示5s，模式灯保持至休眠。
- *        灯号读取parameter.h，调速绿色灯从1档累加到当前档，情景红色保持单灯。
+ * @brief 每1ms更新显示；电量限5s，有故障且按住扳机则持续循环报码，松手即停。
+ *        模式灯保持至休眠；灯号读取parameter.h，调速绿色累加，情景红色保持单灯。
  */
 void UO_Led_Handler(void)
 {
@@ -111,20 +111,20 @@ void UO_Led_Handler(void)
 		/* LED4照明随整板EN断电，挡位显存和三IO电量灯同时清零。 */
 		ledData.Word=0;
 		battery_display_ms=BATTERY_LED_TIME;
-		user_led_control.LedRunTimes=0;
+		user_led_control.LedRunning=0;
 		user_led_control.LedDeal=0;
 		TM1650_Clear();
 		return;
 	}
 	battery_display_en=(battery_display_ms<BATTERY_LED_TIME);
-	if(battery_display_en && LedError_Control() && trigger)
+	if(trigger && LedError_Control())
 	{
 		LedError_Run();
 	}
 	else
 	{
 		user_led_control.LedDeal=0;
-		user_led_control.LedRunTimes=0;
+		user_led_control.LedRunning=0;
 		LedSoc_Run(user_list.VBus_Vx100, battery_display_en, 0);
 	}
 	/* 计数到5s饱和，避免长时间扣住后溢出重新点亮；模式灯保持到休眠。 */
@@ -175,7 +175,7 @@ void led_tm1650_handle(void)
 }
 
 /**
- * @brief 按锁存故障优先级选择电量灯闪烁报码，返回是否存在需要显示的故障。
+ * @brief 启动持续循环报码并在每轮开始前刷新故障优先级，返回是否有待显示故障。
  */
 uint8_t LedError_Control(void)
 {
@@ -189,13 +189,13 @@ uint8_t LedError_Control(void)
 	{
 		user_led_control.LedRunCnt_Once=0;
 		user_led_control.LedDeal=0;
-		user_led_control.LedRunTimes=0;
+		user_led_control.LedRunning=0;
 		return 0;
 	}
-	if(!user_led_control.LedDeal && !user_led_control.LedRunTimes)
+	if(!user_led_control.LedRunning || user_led_control.LedDeal)
 	{
 		user_led_control.LedDeal=1;
-		user_led_control.LedRunTimes=10;
+		user_led_control.LedRunning=1;
 		user_led_control.LedRunMode=1;
 		if(machine_error_hold.userErr_hold.bits.gIBusAcmpOCP)
 		{
@@ -260,12 +260,24 @@ uint8_t LedError_Control(void)
 }
 
 /**
- * @brief 每1ms推进故障报码闪烁节奏，由电量显示窗口决定是否继续调用。
+ * @brief 每1ms推进报码，闪完一轮按原间隔继续循环；按住扳机不限制轮数，松手立即停。
  */
 void LedError_Run(void)
 {
     static uint16_t bzCnt  = 0;     /* 当前剩余闪烁段数 */
     static uint16_t bzTime = 0;     /* 段内计时 */
+
+    /* 直接调用报码函数时也检查扳机，防止释放后继续执行剩余闪烁。 */
+    if(!user_list.flag.bits.gToolTrigger || !user_led_control.LedRunning ||
+       user_list.user_state==TOOL_POWER_DOWN)
+    {
+        LED_ERROR_OFF();
+        user_led_control.LedRunning=0;
+        user_led_control.LedDeal=0;
+        bzCnt=0;
+        bzTime=0;
+        return;
+    }
 
     if(user_led_control.LedDeal)
     {
@@ -275,15 +287,6 @@ void LedError_Run(void)
         bzTime = 0;
 
         user_led_control.LedDeal = 0;
-    }
-
-    if(!user_led_control.LedRunTimes)
-    {
-        LED_ERROR_OFF();
-
-        bzCnt  = 0;
-        bzTime = 0;
-        return;
     }
 
     if(bzCnt)
@@ -332,8 +335,9 @@ void LedError_Run(void)
         if(bzTime++ >= 1500)                        /* 轮间隔 1500ms */
         {
             bzTime = 0;
+            /* 持续重开下一轮，并通知控制函数在下一次调用时重新按优先级选故障码。 */
             bzCnt  = user_led_control.LedRunCnt_Once;
-            user_led_control.LedRunTimes--;
+            user_led_control.LedDeal=1;
         }
     }
 }

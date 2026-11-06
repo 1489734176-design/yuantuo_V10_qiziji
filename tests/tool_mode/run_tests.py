@@ -6,11 +6,27 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-05-reverse-scene-memory/control-tests'
+OUT = ROOT / '.planning/2026-11-06-scene-load-alarm/control-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
+
+
+def extract_last_function(path, signature):
+    """抽取最后一个同名函数，以测试当前#else中实际启用的电流保护实现。"""
+    source = path.read_text(encoding='utf-8')
+    start = source.rindex(signature)
+    opening = source.index('{', start)
+    depth = 0
+    for pos in range(opening, len(source)):
+        if source[pos] == '{':
+            depth += 1
+        elif source[pos] == '}':
+            depth -= 1
+            if depth == 0:
+                return source[start:pos + 1]
+    raise ValueError(f'Unbalanced function in {path}')
 
 
 def main():
@@ -31,6 +47,7 @@ def main():
         code.append(runner.extract_function(prefix / 'USER/user_control.c', signature))
     if not args.baseline:
         code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void user_direction_handle(void)'))
+        code.append(extract_last_function(ROOT / 'USER/user_control.c', 'void user_oc_handle(void)'))
         code.append(runner.extract_function(ROOT / 'MOTOR_CONTROL/motor_control.c', 'void pwm_set(void)'))
     code += ['#define TEST_BASELINE ' + str(int(args.baseline)),
              '#define TEST_ONLY_CASE ' + str(args.case),

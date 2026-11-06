@@ -177,22 +177,37 @@ static void test_direction_and_key(void)
 	CHECK(key_scan()==0);
 }
 
+/** @brief 验证13闪报码连续循环超过10轮，轮间仍保持原间隔，只有松扳机才停止。 */
 static void test_blink_cycle(void)
 {
-	unsigned ticks=0, rises=0;
+	unsigned ticks, phase, rises=0;
 	uint8_t was_on=0;
 	memset(&machine_error_hold, 0, sizeof(machine_error_hold));
 	memset(&user_led_control, 0, sizeof(user_led_control));
+	user_list.user_state=TOOL_ERROR_STOP;
+	user_list.flag.bits.gToolTrigger=1;
 	machine_error_hold.userErr_hold.bits.gIBusAvgOCP4=1;
 	LedError_Control();
-	while(user_led_control.LedRunTimes==10 && ticks++<12000)
+	/* 每闪701ms，轮间1501ms：13闪一轮10614ms，直接运行12轮，无需外层重装次数。 */
+	for(ticks=1;ticks<=127368;ticks++)
 	{
 		LedError_Run();
 		CHECK(LED1==LED2 && LED2==LED3);
+		phase=(ticks-1)%10614;
+		CHECK(LED1==(phase<9113 && phase%701>=500));
 		if(LED1 && !was_on) rises++;
 		was_on=LED1;
 	}
-	CHECK(rises==13 && user_led_control.LedRunTimes==9);
+	CHECK(rises==156);
+	/* 第13轮亮灯时松手，报码必须立即终止。 */
+	for(ticks=0;ticks<501;ticks++) LedError_Run();
+	CHECK((ledData.Word & 0x0e)==0x0e);
+	user_list.flag.bits.gToolTrigger=0;
+	for(ticks=0;ticks<5001;ticks++)
+	{
+		LedError_Run();
+		CHECK((ledData.Word & 0x0e)==0);
+	}
 }
 
 static void test_soc_immediate_run(void)
@@ -350,21 +365,41 @@ static void test_battery_window_hold_and_repress(void)
 	CHECK((ledData.Word & 0x0e)==0 && TM1650_GetDigit(1)==0x40);
 }
 
+/** @brief 验证故障跨过电量5s持续循环20轮，每轮节奏不变，松扳机立即停闪并按原时间休眠。 */
 static void test_fault_hold_and_release_sleep(void)
 {
-	unsigned i;
+	unsigned i, phase, rises=0, rises_after_5s=0;
+	uint8_t was_on=0;
 	reset_light_fixture();
 	user_list.user_state=TOOL_ERROR_STOP;
 	user_list.userErr.bits.gNtcMos=1;
 	machine_error_hold.userErr_hold.bits.gNtcMos=1;
-	for(i=0;i<30050;i++)
+	for(i=1;i<=72080;i++)
 	{
 		run_light_tick();
 		CHECK(user_list.user_state==TOOL_ERROR_STOP && user_list.sleep_cnt==0);
 		CHECK(TM1650_GetDigit(0)==0x40 && (EN_PORT->ODR & EN_PIN));
-		if(i>=5000) CHECK((ledData.Word & 0x0e)==0);
+		CHECK(LED1==LED2 && LED2==LED3);
+		/* 三闪一轮：每闪701ms，加1501ms轮间隔；连续20轮均逐毫秒核对。 */
+		phase=(i-1)%3604;
+		CHECK(LED1==(phase<2103 && phase%701>=500));
+		if(LED1 && !was_on)
+		{
+			rises++;
+			if(i>5000) rises_after_5s++;
+		}
+		was_on=LED1;
+		/* 第二轮第2闪横跨5s，边界不能关灯，也不能重置为新一轮。 */
+		if(i==5000 || i==5001 || i==5006 || i==5507 || i==5707)
+			CHECK((ledData.Word & 0x0e)==0x0e);
+		if(i==5007 || i==5506 || i==5708)
+			CHECK((ledData.Word & 0x0e)==0);
 		CHECK(!user_list.flag.bits.gToolEn);
 	}
+	CHECK(rises==60 && rises_after_5s==55);
+	/* 第21轮仍自行继续，在亮灯段松手验证立即停止报码。 */
+	for(i=0;i<501;i++) run_light_tick();
+	CHECK((ledData.Word & 0x0e)==0x0e);
 	user_list.flag.bits.gToolTrigger=0;
 	for(i=0;i<14999;i++)
 	{
@@ -379,6 +414,72 @@ static void test_fault_hold_and_release_sleep(void)
 	CHECK(machine_error_hold.userErr_hold.bits.gNtcMos); /* 关灯不得清保护。 */
 	run_light_tick();
 	CHECK(!(EN_PORT->ODR & EN_PIN));
+}
+
+/** @brief 验证持续循环每轮刷新故障优先级，间隔中松手可停闪，重新扣动从第一闪开始。 */
+static void test_fault_repeat_priority_and_repress(void)
+{
+	unsigned i;
+	reset_light_fixture();
+	user_list.user_state=TOOL_ERROR_STOP;
+	user_list.userErr.bits.gNtcMos=1;
+	machine_error_hold.userErr_hold.bits.gNtcMos=1;
+	for(i=1;i<=3604;i++)
+	{
+		run_light_tick();
+		CHECK(user_led_control.LedRunCnt_Once==3);
+		/* 第一轮进行中追加高优先级故障，本轮先按原三闪完整结束。 */
+		if(i==501) machine_error_hold.userErr_hold.bits.gIBusAcmpOCP=1;
+	}
+	/* 下一轮必须选择最高优先级的一闪码，不能永久锁在最初的三闪码。 */
+	for(i=1;i<=3102;i++)
+	{
+		run_light_tick();
+		CHECK(user_led_control.LedRunCnt_Once==1);
+		CHECK(LED1==(((i-1)%2202)>=500 && ((i-1)%2202)<701));
+	}
+	/* 当前处于轮间间隔，电量5s也已到期；释放后不能稍晚再冒出下一轮。 */
+	user_list.flag.bits.gToolTrigger=0;
+	for(i=0;i<2500;i++)
+	{
+		run_light_tick();
+		CHECK((ledData.Word & 0x0e)==0);
+	}
+	CHECK(machine_error_hold.userErr_hold.bits.gNtcMos && machine_error_hold.userErr_hold.bits.gIBusAcmpOCP);
+	user_list.flag.bits.gToolTrigger=1;
+	for(i=1;i<=501;i++)
+	{
+		run_light_tick();
+		CHECK(LED1==(i==501));
+	}
+}
+
+/** @brief 验证电量已熄灭后才出现的故障仍能启动报警，并保留硬件过流最高优先级。 */
+static void test_fault_after_battery_window(void)
+{
+	unsigned i;
+	reset_light_fixture();
+	for(i=0;i<5001;i++) run_light_tick();
+	CHECK((ledData.Word & 0x0e)==0);
+	user_list.user_state=TOOL_ERROR_STOP;
+	user_list.userErr.bits.gIBusAcmpOCP=1;
+	user_list.userErr.bits.gNtcMos=1;
+	machine_error_hold.userErr_hold.bits.gIBusAcmpOCP=1;
+	machine_error_hold.userErr_hold.bits.gNtcMos=1;
+	for(i=1;i<=2202;i++)
+	{
+		run_light_tick();
+		CHECK(user_led_control.LedRunCnt_Once==1);
+		if(i>=501 && i<=701) CHECK((ledData.Word & 0x0e)==0x0e);
+		else CHECK((ledData.Word & 0x0e)==0);
+		CHECK(user_list.user_state==TOOL_ERROR_STOP && !user_list.flag.bits.gToolEn);
+	}
+	CHECK((ledData.Word & 0x0e)==0);
+	/* 故障清除后回到普通电量显示，原5s窗口仍已耗尽。 */
+	machine_error_hold.userErr_hold.word=0;
+	user_list.userErr.word=0;
+	run_light_tick();
+	CHECK((ledData.Word & 0x0e)==0);
 }
 
 /** @brief 验证调速累计四灯、正转情景单灯及反转情景LED5，并保持NTC保护回归。 */
@@ -479,7 +580,7 @@ static void test_direction_speed_led_handoff(void)
 	CHECK(tool_mode_gear()==4 && TM1650_GetDigit(0)==0x78 && TM1650_GetDigit(1)==0);
 }
 
-/** @brief 按独立场景运行灯显、保护、方向门控及调速换向交接回归。 */
+/** @brief 按独立场景运行灯显、保护、方向门控、换向交接及报警不受电量窗口限制的回归。 */
 uint32_t run_tests(void)
 {
 	tool_mode_init();
@@ -494,7 +595,14 @@ uint32_t run_tests(void)
 		test_case=test_boot_scenario;
 		if(test_boot_scenario==6) test_battery_window_hold_and_repress();
 		if(test_boot_scenario==7) test_release_sleep_and_repress();
-		if(test_boot_scenario==8) test_fault_hold_and_release_sleep();
+		if(test_boot_scenario==8)
+		{
+			test_fault_after_battery_window();
+			if(test_failure_line) return test_failure_line;
+			test_fault_repeat_priority_and_repress();
+			if(test_failure_line) return test_failure_line;
+			test_fault_hold_and_release_sleep();
+		}
 		return test_failure_line;
 	}
 	if(test_boot_scenario)

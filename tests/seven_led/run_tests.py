@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-05-reverse-scene-memory/board-tests'
+OUT = ROOT / '.planning/2026-11-06-scene-load-alarm/board-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)
@@ -100,7 +100,7 @@ def execute(image, boot_scenario=0, source_name='test_seven_led.c'):
         raise AssertionError(f'case {case}, {source_name}:{line}, after {checks} checks')
     label = ('SWD startup profile' if boot_scenario == 5 else
              f'SOC boot profile {boot_scenario}' if boot_scenario else f'{case} cases')
-    label = {6: 'battery 5s hold/repress', 7: 'release 15s sleep/wake', 8: 'fault 5s display/15s sleep'}.get(boot_scenario, label)
+    label = {6: 'battery 5s hold/repress', 7: 'release 15s sleep/wake', 8: 'fault independent of 5s window/15s sleep'}.get(boot_scenario, label)
     print(f'PASS: {label}, {checks} checks (ARM C / simulated GPIO, not a bench test)')
 
 if __name__ == '__main__':

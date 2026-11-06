@@ -711,9 +711,146 @@ static void test_boot_speed_direction_restore(void)
 	CHECK(tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD && tool_mode_gear()==3);
 	CHECK(tool_mode_list.save_pending);
 }
+/** @brief 建立正转情景1档运行许可，并确认初始正常目标为18%。 */
+static void scene_load_fixture(void)
+{
+	erase_fixture(); boot_fixture();
+	machine_error_hold.userErr_hold.word=0;
+	machine_error_hold.MC_error_hold.word=0;
+	mc_core_list.MC_error.word=0;
+	user_list.IBusAvg_Adc=0;
+	tool_mode_key_event(0x46);
+	user_list.flag.bits.gToolTrigger=1;
+	user_list.flag.bits.gToolEn=1;
+	mc_core_list.motor_en=1;
+	motor_control_list.bldc_state=MOTOR_RUN;
+	CHECK(tool_mode_duty(281)==337);
+}
+
+/** @brief 验证3.5A升速、2.0A卸载迟滞及20/100ms确认边界。 */
+static void test_scene_load_thresholds(void)
+{
+	scene_load_fixture();
+	tick_ms(100); CHECK(tool_mode_duty(281)==337);
+	/* 8.91891码/A，31码低于3.5A，32码达到；峰值电流不参与本档负载判断。 */
+	user_list.IBusAvg_Adc=31;
+	user_list.IBusPeak_Adc=2000;
+	tick_ms(1000); CHECK(tool_mode_duty(1874)==337);
+	user_list.IBusAvg_Adc=32;
+	CHECK(tool_mode_duty(281)==337);
+	tick_ms(19); CHECK(tool_mode_duty(281)==337);
+	tick_ms(1); CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvg_Adc=18;
+	tick_ms(1000); CHECK(tool_mode_duty(281)==1874);
+	/* 17码低于2.0A；卸载持续确认后恢复原档目标，扳机仍然扣住。 */
+	user_list.IBusAvg_Adc=17;
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(99); CHECK(tool_mode_duty(281)==1874);
+	tick_ms(1); CHECK(tool_mode_duty(1874)==337);
+	user_list.IBusAvg_Adc=12;
+	tick_ms(5000); CHECK(tool_mode_duty(281)==337);
+}
+
+/** @brief 验证启动尖峰屏蔽、重复调用不耗时、负载与卸载抖动均需重新连续确认。 */
+static void test_scene_load_debounce(void)
+{
+	uint16_t i;
+	scene_load_fixture(); user_list.IBusAvg_Adc=100;
+	tick_ms(99); CHECK(tool_mode_duty(281)==337);
+	tick_ms(1); CHECK(tool_mode_duty(281)==337);
+	for(i=0;i<1000;i++) CHECK(tool_mode_duty(281)==337);
+	tick_ms(19); CHECK(tool_mode_duty(281)==337);
+	user_list.IBusAvg_Adc=31; CHECK(tool_mode_duty(281)==337);
+	user_list.IBusAvg_Adc=32; CHECK(tool_mode_duty(281)==337);
+	tick_ms(19); CHECK(tool_mode_duty(281)==337);
+	tick_ms(1); CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvg_Adc=12; CHECK(tool_mode_duty(281)==1874);
+	tick_ms(99); CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvg_Adc=18; CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvg_Adc=12; CHECK(tool_mode_duty(281)==1874);
+	tick_ms(99); CHECK(tool_mode_duty(281)==1874);
+	tick_ms(1); CHECK(tool_mode_duty(281)==337);
+}
+
+/** @brief 验证松扳机、撤销使能、停机及实时/锁存故障清除升速进度，不绕过保护。 */
+static void test_scene_load_reset(void)
+{
+	uint8_t gate;
+	for(gate=0;gate<8;gate++)
+	{
+		scene_load_fixture(); user_list.IBusAvg_Adc=32;
+		tick_ms(100); (void)tool_mode_duty(281);
+		tick_ms(20); CHECK(tool_mode_duty(281)==1874);
+		if(gate==0) user_list.flag.bits.gToolTrigger=0;
+		if(gate==1) user_list.flag.bits.gToolEn=0;
+		if(gate==2) mc_core_list.motor_en=0;
+		if(gate==3) motor_control_list.bldc_state=MOTOR_HBRAKE;
+		if(gate==4) user_list.userErr.bits.gNtcMos=1;
+		if(gate==5) mc_core_list.MC_error.bits.gBlock=1;
+		if(gate==6) machine_error_hold.userErr_hold.bits.gVBusStbUVP=1;
+		if(gate==7) machine_error_hold.MC_error_hold.bits.gBlock=1;
+		CHECK(tool_mode_duty(281)==337);
+		user_list.flag.bits.gToolTrigger=1; user_list.flag.bits.gToolEn=1;
+		mc_core_list.motor_en=1; motor_control_list.bldc_state=MOTOR_RUN;
+		user_list.userErr.word=0; mc_core_list.MC_error.word=0;
+		machine_error_hold.userErr_hold.word=0; machine_error_hold.MC_error_hold.word=0;
+		CHECK(tool_mode_duty(281)==337);
+		tick_ms(99); CHECK(tool_mode_duty(281)==337);
+		tick_ms(1); CHECK(tool_mode_duty(281)==337);
+		tick_ms(20); CHECK(tool_mode_duty(281)==1874);
+	}
+}
+
+/** @brief 验证升速仅用于正转情景1档，换模式/方向或换挡后清除旧状态。 */
+static void test_scene_load_mode_scope(void)
+{
+	scene_load_fixture(); user_list.IBusAvg_Adc=32;
+	tick_ms(100); (void)tool_mode_duty(281);
+	tick_ms(20); CHECK(tool_mode_duty(281)==1874);
+	user_list.flag.bits.gToolTrigger=0;
+	tool_mode_key_event(0x47);
+	CHECK(tool_mode_duty(1874)==712);
+	tool_mode_key_event(0x46);
+	user_list.flag.bits.gToolTrigger=1;
+	CHECK(tool_mode_duty(281)==337);
+	tick_ms(100); (void)tool_mode_duty(281);
+	tick_ms(20); CHECK(tool_mode_duty(281)==1874);
+	direction(TOOL_DIRECTION_REVERSE);
+	CHECK(tool_mode_duty(1874)==712);
+	direction(TOOL_DIRECTION_FORWARD);
+	CHECK(tool_mode_duty(281)==337);
+	user_list.flag.bits.gToolTrigger=0;
+	tool_mode_key_event(0x46); CHECK(tool_mode_gear()==2 && tool_mode_duty(281)==1874);
+	tool_mode_key_event(0x46); CHECK(tool_mode_gear()==3 && tool_mode_duty(281)==1874);
+	tool_mode_key_event(0x46); CHECK(tool_mode_gear()==1 && tool_mode_duty(281)==337);
+}
+
+/** @brief 验证实际过流采样链先扣零偏及校准增益，再供情景负载判断使用。 */
+static void test_scene_load_calibrated_current(void)
+{
+	scene_load_fixture();
+	mc_core_list.CurrentOffset_ad_data=100;
+	user_list.Vcc_cal_gain=49152;
+	mc_core_list.Board_ADC_DATA.u16I_Peak=100;
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=121;
+	user_oc_handle(); CHECK(user_list.IBusAvg_Adc==31);
+	tick_ms(100); CHECK(tool_mode_duty(281)==337);
+	tick_ms(20); CHECK(tool_mode_duty(281)==337);
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=122;
+	user_oc_handle(); CHECK(user_list.IBusAvg_Adc==33);
+	CHECK(tool_mode_duty(281)==337);
+	tick_ms(20); CHECK(tool_mode_duty(281)==1874);
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=108;
+	user_oc_handle(); CHECK(user_list.IBusAvg_Adc==12);
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(100); CHECK(tool_mode_duty(281)==337);
+	/* 原始值低于零偏必须钳为零，不能无符号下溢误判重载。 */
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=99;
+	user_oc_handle(); CHECK(user_list.IBusAvg_Adc==0);
+}
 #endif
 
-/** @brief 运行模式、反转时序、Flash兼容和双调速换向沿用档位的实际ARM行为用例。 */
+/** @brief 运行模式、反转时序、Flash兼容、换向记忆及情景1档负载升速回归。 */
 void run_tests(void)
 {
 #if TEST_BASELINE
@@ -738,5 +875,7 @@ void run_tests(void)
 	RUN(20,test_dual_direction_partial_and_crc); RUN(21,test_v1_v2_migration_and_ranges);
 	RUN(22,test_reverse_pwm_first_full_frontend_gap); RUN(23,test_reverse_pwm_brief_full_frontend_gap);
 	RUN(24,test_speed_direction_transfer); RUN(25,test_speed_transfer_save); RUN(26,test_boot_speed_direction_restore);
+	RUN(27,test_scene_load_thresholds); RUN(28,test_scene_load_debounce); RUN(29,test_scene_load_reset);
+	RUN(30,test_scene_load_mode_scope); RUN(31,test_scene_load_calibrated_current);
 #endif
 }

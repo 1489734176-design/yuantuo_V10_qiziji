@@ -15,13 +15,30 @@ static uint8_t key_press_latched;
 static volatile uint32_t mode_clock_ms;
 static volatile uint32_t reverse_scene_full_start;
 static volatile uint8_t reverse_scene_stage;
+static uint8_t scene_load_running;
+static uint8_t scene_load_boost;
+static uint8_t scene_load_pending;
+static uint32_t scene_load_run_start;
+static uint32_t scene_load_confirm_start;
 
 #define REVERSE_SCENE_RAMP (0u)
 #define REVERSE_SCENE_HOLD (1u)
 #define REVERSE_SCENE_LOW  (2u)
 
 /**
- * @brief 初始化正反转独立模式、挡位、反转曲线及按键状态，上电默认不写Flash。
+ * @brief 清除正转情景1挡本次运行的负载升速和计时，不改变模式挡位记忆。
+ */
+static void tool_mode_scene_load_reset(void)
+{
+	scene_load_running=0;
+	scene_load_boost=0;
+	scene_load_pending=0;
+	scene_load_run_start=0;
+	scene_load_confirm_start=0;
+}
+
+/**
+ * @brief 初始化正反转独立模式、挡位、情景曲线及负载状态，上电默认不写Flash。
  */
 void tool_mode_init(void)
 {
@@ -37,6 +54,7 @@ void tool_mode_init(void)
 	mode_clock_ms=0;
 	reverse_scene_full_start=0;
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
+	tool_mode_scene_load_reset();
 	key_poll_count=0;
 	key_candidate=0;
 	key_stable_count=0;
@@ -54,12 +72,13 @@ tool_mode_setting_t *tool_mode_current(void)
 }
 
 /**
- * @brief 首次上电选择开关所在方向的记忆，并同步档位及清除反转曲线进度。
+ * @brief 恢复开关所在方向的记忆，同步档位并清除反转曲线及正转负载升速进度。
  */
 void tool_mode_restore_direction(uint8_t reverse)
 {
 	tool_mode_list.active_direction=reverse ? TOOL_DIRECTION_REVERSE : TOOL_DIRECTION_FORWARD;
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
+	tool_mode_scene_load_reset();
 	user_list.gears_level=tool_mode_gear()-1;
 }
 
@@ -82,7 +101,7 @@ void tool_mode_set_direction(uint8_t reverse)
 }
 
 /**
- * @brief 在1ms中断内递增曲线时钟，前台按时间差计时，避免丢失时间片。
+ * @brief 在1ms中断内递增情景曲线及负载检测时钟，前台按时间差计时。
  */
 void tool_mode_tick_1ms(void)
 {
@@ -104,6 +123,7 @@ uint8_t tool_mode_gear(void)
 
 /**
  * @brief 处理一次有效按压，反转情景键只切模式，正转按键与调速升挡保持原逻辑。
+ *        有效切换后清除本次运行的情景曲线和负载升速进度。
  * @param key K2调速键或K3情景键的TM1650键码。
  */
 void tool_mode_key_event(uint8_t key)
@@ -145,6 +165,7 @@ void tool_mode_key_event(uint8_t key)
 	}
 	/* 旧用户结构保留0起始挡位索引，持久化使用新模块的1起始挡位。 */
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
+	tool_mode_scene_load_reset();
 	user_list.gears_level=tool_mode_gear()-1;
 	tool_mode_list.save_pending=1;
 	user_list.sleep_cnt=0;
@@ -257,8 +278,67 @@ static uint16_t tool_mode_reverse_scene_duty(void)
 }
 
 /**
+ * @brief 正转情景1挡按平均电流确认负载升速，卸载后恢复正常目标，保持原PWM软坡。
+ */
+static uint16_t tool_mode_scene_load_duty(void)
+{
+	uint16_t normal=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*TOOL_SCENE_GEAR1_DUTY_PERCENT)/100u);
+	uint16_t boost=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT)/100u);
+	uint32_t now;
+	uint32_t confirm_ms;
+	uint8_t threshold_met;
+	/* 任一许可或保护条件失效都清除升速状态；实际停机仍由原保护及电机状态机处理。 */
+	if(!user_list.flag.bits.gToolTrigger || !user_list.flag.bits.gToolEn ||
+	   !mc_core_list.motor_en || motor_control_list.bldc_state!=MOTOR_RUN ||
+	   user_list.userErr.word || mc_core_list.MC_error.word ||
+	   machine_error_hold.userErr_hold.word || machine_error_hold.MC_error_hold.word)
+	{
+		tool_mode_scene_load_reset();
+		return normal;
+	}
+	now=mode_clock_ms;
+	if(!scene_load_running)
+	{
+		scene_load_running=1;
+		scene_load_run_start=now;
+	}
+	/* 启动屏蔽只作用于本次运行开始，避免启动尖峰直接触发满占空比。 */
+	if((uint32_t)(now-scene_load_run_start)<TOOL_SCENE_GEAR1_STARTUP_MASK_MS)
+	{
+		scene_load_pending=0;
+		return normal;
+	}
+	/* 使用扣零偏及VCC校准后的平均电流；独立升降阈值形成迟滞。 */
+	if(scene_load_boost)
+	{
+		threshold_met=user_list.IBusAvg_Adc<=TOOL_SCENE_GEAR1_LOAD_OFF_ADC;
+		confirm_ms=TOOL_SCENE_GEAR1_LOAD_OFF_MS;
+	}
+	else
+	{
+		threshold_met=user_list.IBusAvg_Adc>=TOOL_SCENE_GEAR1_LOAD_ON_ADC;
+		confirm_ms=TOOL_SCENE_GEAR1_LOAD_ON_MS;
+	}
+	if(!threshold_met)
+	{
+		scene_load_pending=0;
+	}
+	else if(!scene_load_pending)
+	{
+		scene_load_pending=1;
+		scene_load_confirm_start=now;
+	}
+	else if((uint32_t)(now-scene_load_confirm_start)>=confirm_ms)
+	{
+		scene_load_boost=!scene_load_boost;
+		scene_load_pending=0;
+	}
+	return scene_load_boost ? boost : normal;
+}
+
+/**
  * @brief 按parameter.h中的当前挡百分比生成目标PWM计数。
- *        调速连续映射扳机，正转情景使用固定目标，反转情景使用定时降速曲线。
+ *        调速映射扳机，正转情景1挡按负载升降速，反转情景按定时曲线降速。
  * @param trigger_duty 原扳机映射的PWM计数。
  * @return 当前模式及挡位的目标PWM计数，实际输出继续经过软启动和保护。
  */
@@ -278,14 +358,21 @@ uint16_t tool_mode_duty(uint16_t trigger_duty)
 	tool_mode_setting_t *setting=tool_mode_current();
 	if(setting->mode==TOOL_MODE_SCENE)
 	{
-		if(tool_mode_list.active_direction==TOOL_DIRECTION_REVERSE) return tool_mode_reverse_scene_duty();
+		if(tool_mode_list.active_direction==TOOL_DIRECTION_REVERSE)
+		{
+			tool_mode_scene_load_reset();
+			return tool_mode_reverse_scene_duty();
+		}
 		reverse_scene_stage=REVERSE_SCENE_RAMP;
-		/* 情景三挡均读取独立宏定义；目标与扣动深度无关。 */
+		/* 正转1挡按负载切换目标，2/3挡仍读取固定目标；均与扣动深度无关。 */
 		gear=setting->scene_gear;
 		if(gear<1 || gear>3) gear=1;
+		if(gear==1) return tool_mode_scene_load_duty();
+		tool_mode_scene_load_reset();
 		return (uint16_t)(((uint32_t)PWM_PRIOD_LOAD*scene_percent[gear-1])/100u);
 	}
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
+	tool_mode_scene_load_reset();
 	gear=setting->speed_gear;
 	if(gear<1 || gear>4) gear=1;
 	maximum=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*speed_percent[gear-1])/100u);

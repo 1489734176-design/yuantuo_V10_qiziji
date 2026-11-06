@@ -75,7 +75,7 @@ typedef struct
 {
     uint8_t LedDeal;
     uint8_t LedRunMode;
-    uint16_t LedRunTimes;
+    uint8_t LedRunning;       /* 非零表示故障报码持续循环，不再按总轮数递减。 */
     uint16_t LedRunCnt_Once;
     uint8_t gSocUpdate;
 } User_LED_Control_t;

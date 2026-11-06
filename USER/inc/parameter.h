@@ -29,7 +29,8 @@
  * 灯号填写原理图LED编号，范围5～8；调速累加1档至当前档的灯，情景仅亮当前档灯。
  * 占空比单位为百分比，范围15～100，最低输出仍受MIN_TOOL_DUTY限制。
  * 调速模式：扳机从最低占空比连续调节到本挡上限。
- * 情景模式：每挡固定目标占空比，扳机只控制启停，软启动及保护继续生效。
+ * 情景模式：扳机只控制启停，正转1挡按负载升降速，其余按固定目标或定时曲线运行。
+ * 所有目标仍经过原软启动及保护。
  */
 #define TOOL_SPEED_GEAR1_LED          (8u)  // 调速1挡点亮LED8
 #define TOOL_SPEED_GEAR2_LED          (7u)  // 调速2挡在前挡基础上增加LED7
@@ -44,9 +45,22 @@
 #define TOOL_SPEED_GEAR2_DUTY_PERCENT (58u) // 调速2挡占空比上限，单位%
 #define TOOL_SPEED_GEAR3_DUTY_PERCENT (78u) // 调速3挡占空比上限，单位%
 #define TOOL_SPEED_GEAR4_DUTY_PERCENT (100u) // 调速4挡占空比上限，单位%
-#define TOOL_SCENE_GEAR1_DUTY_PERCENT (18u) // 情景1挡固定目标，单位%
+#define TOOL_SCENE_GEAR1_DUTY_PERCENT (18u) // 正转情景1挡空载/卸载后的正常目标，单位%
 #define TOOL_SCENE_GEAR2_DUTY_PERCENT (100u) // 情景2挡固定目标，单位%
 #define TOOL_SCENE_GEAR3_DUTY_PERCENT (100u) // 情景3挡固定目标，单位%
+#define TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT (100u) // 正转情景1挡确认负载后的目标，单位%
+#define TOOL_SCENE_GEAR1_LOAD_ON_MA         (3500u) // 校准平均电流达到3.5A，开始负载确认
+#define TOOL_SCENE_GEAR1_LOAD_OFF_MA        (2000u) // 样机空载约1.3A，降至2.0A及以下开始卸载确认
+#define TOOL_SCENE_GEAR1_STARTUP_MASK_MS    (100u)  // 进入正常运行后屏蔽启动电流，单位ms
+#define TOOL_SCENE_GEAR1_LOAD_ON_MS         (20u)   // 连续达到负载阈值的确认时间，单位ms
+#define TOOL_SCENE_GEAR1_LOAD_OFF_MS        (100u)  // 连续达到卸载阈值的确认时间，单位ms
+/* 自动换算为校准后的ADC码：负载向上取整，卸载向下取整，默认分别为32码和17码。 */
+#define TOOL_SCENE_GEAR1_LOAD_ON_ADC \
+    ((uint16_t)(TOOL_SCENE_GEAR1_LOAD_ON_MA*CURRENT_ADC_PER_A/1000.0f)+ \
+    ((TOOL_SCENE_GEAR1_LOAD_ON_MA*CURRENT_ADC_PER_A/1000.0f)> \
+    (uint16_t)(TOOL_SCENE_GEAR1_LOAD_ON_MA*CURRENT_ADC_PER_A/1000.0f) ? 1u : 0u))
+#define TOOL_SCENE_GEAR1_LOAD_OFF_ADC \
+    ((uint16_t)(TOOL_SCENE_GEAR1_LOAD_OFF_MA*CURRENT_ADC_PER_A/1000.0f))
 #define TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT (100u) // 反转情景升速目标，单位%
 #define TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT  (15u)  // 反转情景降速后目标，单位%
 #define TOOL_REVERSE_SCENE_FULL_TIME_MS      (850u) // 达到升速目标后的保持时间，单位ms
@@ -64,6 +78,7 @@
     !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR3_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR4_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR1_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR2_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR3_DUTY_PERCENT) || \
+    !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT)
 #error "Mode duty percentages must be in the range 15..100."
@@ -71,6 +86,16 @@
 #if TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT>TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT || \
     TOOL_REVERSE_SCENE_FULL_TIME_MS<1 || TOOL_REVERSE_SCENE_FULL_TIME_MS>60000
 #error "Reverse scene requires low duty <= full duty and a hold time in 1..60000 ms."
+#endif
+#if TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT<TOOL_SCENE_GEAR1_DUTY_PERCENT || \
+    TOOL_SCENE_GEAR1_LOAD_OFF_MA<1 || TOOL_SCENE_GEAR1_LOAD_OFF_MA>=TOOL_SCENE_GEAR1_LOAD_ON_MA || \
+    TOOL_SCENE_GEAR1_LOAD_ON_MA>100000
+#error "Scene gear 1 requires boost >= normal duty and 0 < off < on <= 100000 mA."
+#endif
+#if TOOL_SCENE_GEAR1_STARTUP_MASK_MS>60000 || \
+    TOOL_SCENE_GEAR1_LOAD_ON_MS<1 || TOOL_SCENE_GEAR1_LOAD_ON_MS>60000 || \
+    TOOL_SCENE_GEAR1_LOAD_OFF_MS<1 || TOOL_SCENE_GEAR1_LOAD_OFF_MS>60000
+#error "Scene gear 1 requires startup mask in 0..60000 ms and confirmation times in 1..60000 ms."
 #endif
 #undef TOOL_MODE_LED_VALID
 #undef TOOL_MODE_DUTY_VALID
