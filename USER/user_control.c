@@ -1728,6 +1728,79 @@ void user_gears_handle(void)
 	#endif
 }
 /**
+ * @brief 正转情景2/3挡螺丝到位保护，每1ms在电流采样和模式更新后调用。
+ *        2挡峰值电流连续大于25A、3挡连续大于30A，达到100ms后置gAutoStop。
+ *        仅控制到位停机使能和计时，不计算目标占空比、不处理堵转重启最低目标。
+ * @note  原过流等保护始终生效；更快的故障保护可能在本函数计满前先停机。
+ */
+void user_screw_seat_stop_handle(void)
+{
+	static uint16_t seat_stop_count=0;
+	static uint8_t seat_stop_gear=0;
+	uint16_t current_limit;
+	uint16_t confirm_count;
+	tool_mode_setting_t *setting=tool_mode_current();
+	uint8_t gear=setting->scene_gear;
+
+	/* 使能随当前模式派生：正转情景2/3挡为1，其余模式挡位为0，不写Flash。 */
+	user_list.flag.bits.gAutoStopEn=(tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD &&
+		setting->mode==TOOL_MODE_SCENE && (gear==2 || gear==3));
+
+	/* 松扳机、停机、换向未确认、故障或已到位，都结束本次连续超限计时。
+	 * gAutoStop保持锁存，由原user_state_control在停止态检测松扳机后解除。 */
+	if(!user_list.flag.bits.gAutoStopEn || !user_list.flag.bits.gToolTrigger ||
+	   !user_list.flag.bits.gToolEn || !mc_core_list.motor_en ||
+	   user_list.user_state!=TOOL_RUN || motor_control_list.bldc_state!=MOTOR_RUN ||
+	   !user_list.dir_valid || user_list.flag.bits.gToolDir!=Tool_Dir_CW_Value ||
+	   user_list.flag.bits.gAutoStop || user_list.userErr.word || mc_core_list.MC_error.word ||
+	   machine_error_hold.userErr_hold.word || machine_error_hold.MC_error_hold.word)
+	{
+		seat_stop_count=0;
+		seat_stop_gear=0;
+		return;
+	}
+
+	/* 两个挡位不能沿用彼此已累计的时间，切换后从新挡位的第一份有效样本开始。 */
+	if(seat_stop_gear!=gear)
+	{
+		seat_stop_count=0;
+		seat_stop_gear=gear;
+	}
+	if(gear==2)
+	{
+		current_limit=TOOL_SCENE_GEAR2_STOP_CURRENT_AdcValue;
+		confirm_count=TOOL_SCENE_GEAR2_STOP_MS_CONUT;
+	}
+	else
+	{
+		current_limit=TOOL_SCENE_GEAR3_STOP_CURRENT_AdcValue;
+		confirm_count=TOOL_SCENE_GEAR3_STOP_MS_CONUT;
+	}
+
+	/* IBusPeak_Adc已经过零偏扣除和VCC校准，门限使用相同的ADC单位。
+	 * 严格大于才计数；等于或低于门限立即清零，保证连续超限而非累计积分。 */
+	if(user_list.IBusPeak_Adc>current_limit)
+	{
+		if(seat_stop_count<confirm_count) 
+		{
+			seat_stop_count++;
+		}
+		/* 先加后判：默认1000Hz下，第100份连续超限样本触发，不多等一拍。 */
+		if(seat_stop_count>=confirm_count)
+		{
+			user_list.flag.bits.gAutoStop=1;
+		}
+	}
+	else
+	{
+		if(seat_stop_count)
+		{
+			seat_stop_count--;
+		}
+	}
+}
+
+/**
  * @brief  旧版电动扳手的按键、目标占空比及反转自动停机处理
  *        依次完成：扫描按键 -> 修改挡位/自动停机开关 -> 计算目标占空比 -> 判断卸载停机。
  * @note   main.c 仅在 Wrench_EN=1 时于前台1ms任务中调用本函数；当前 Wrench_EN=0，

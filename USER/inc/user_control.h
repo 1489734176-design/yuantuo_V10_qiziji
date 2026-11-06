@@ -137,6 +137,8 @@ void Volt_Handler_fast(void);
 void Volt_Handler(void);
 void gears_deal(void);
 void pwm_duty_aim_deal(void);
+/* 每1ms调用：正转情景2/3挡峰值电流持续超限后置自动停机标志。 */
+void user_screw_seat_stop_handle(void);
 void user_WrenchKey_Handler(void);
 void user_para_init(void);
 void Vcc_5V_CAL(void);

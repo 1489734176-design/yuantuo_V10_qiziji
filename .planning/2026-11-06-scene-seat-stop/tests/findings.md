@@ -1,0 +1,11 @@
+# Findings
+
+- Original case 34 hard-coded a 28 A peak-protection sample and a 101-call boundary. The existing suite reached this sole failure after passing cases 1–33. Per parent direction, revised it to preserve the original safety contract using a minimum over-threshold sample and ceil(32768 / configured integral step) trigger timing, checking both the previous sample and triggering sample.
+- Harness compiles extracted production functions plus tool_mode.c/flash_data_save.c with Arm Compiler 6 for Cortex-M0 and runs the image in Unicorn.
+- The new handler sets enable by active forward scene gear 2/3. Counting requires trigger, tool enable, core motor enable, TOOL_RUN, MOTOR_RUN, valid CW direction, no existing auto-stop, and zero live/latched user/core fault words.
+- Peak current only: gear 2 strict greater-than 25 A for 100 consecutive 1 ms calls; gear 3 strict greater-than 30 A for 100 calls. Any interruption clears elapsed samples. Mode/gear/direction changes and run termination reset; auto-stop latch belongs to the existing state machine.
+- Current active peak protection is 25 A/120 ms, 30 A/50 ms, and 40 A/20 ms. The 30 A/50 ms integral reaches its limit on sample 51 due to integer step truncation, so it preempts gear 3 ordinary seat-stop. New integration tests verify this priority; no production protection settings were modified.
+- Tests exercise the real current-sampling function, fault-latch updater, and state controller. Only battery communication permission and unused GPIO/timer physical effects are isolated by test stubs.
+- Review corrected the integration timing: main samples current, then handles seat stop, controls state, updates held faults, and applies its final motor-enable gate. The generated adapter now extracts this relative call order and the complete original gate if/else from USER/main.c.
+- Case 45 preloads 49 seat samples, then processes 50 actual high-current frames. On the next frame, the new raw OCP competes with seat sample 100 while held faults are still zero. Raw fault gating prevents ordinary auto-stop; final motor permission becomes zero that frame, TOOL_RUN remains until the following frame, and tool enable clears on the subsequent ERROR_STOP frame.
+- Case 46 now checks motor permission becomes zero in the same frame as ordinary gear 2 seat-stop.

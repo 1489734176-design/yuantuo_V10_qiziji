@@ -49,6 +49,22 @@
 #define TOOL_SCENE_GEAR2_DUTY_PERCENT (100u) // 情景2挡固定目标，单位%
 #define TOOL_SCENE_GEAR3_DUTY_PERCENT (100u) // 情景3挡固定目标，单位%
 
+
+
+/* 正转情景2/3挡螺丝到位停机：使用峰值电流，连续超过门限才累计。
+ * 原多级峰值过流仍独立生效；其30A/50ms保护可能先于情景3挡到位判据停机。 */
+#define TOOL_SCENE_GEAR2_STOP_CURRENT            (20.0f) // 情景2挡到位峰值电流，单位A
+#define TOOL_SCENE_GEAR2_STOP_CURRENT_AdcValue   (u16)(TOOL_SCENE_GEAR2_STOP_CURRENT*CURRENT_ADC_PER_A)
+#define TOOL_SCENE_GEAR2_STOP_MS                 (80) // 连续超限确认时间，单位ms
+#define TOOL_SCENE_GEAR2_STOP_MS_CONUT           (u16)((float)TOOL_SCENE_GEAR2_STOP_MS*SLOWLOOP_FRE/1000.0f)
+
+#define TOOL_SCENE_GEAR3_STOP_CURRENT            (25.0f) // 情景3挡到位峰值电流，单位A
+#define TOOL_SCENE_GEAR3_STOP_CURRENT_AdcValue   (u16)(TOOL_SCENE_GEAR3_STOP_CURRENT*CURRENT_ADC_PER_A)
+#define TOOL_SCENE_GEAR3_STOP_MS                 (100) // 连续超限确认时间，单位ms
+#define TOOL_SCENE_GEAR3_STOP_MS_CONUT           (u16)((float)TOOL_SCENE_GEAR3_STOP_MS*SLOWLOOP_FRE/1000.0f)
+
+
+
 #define TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT (100u) // 正转情景1挡确认负载后的目标，单位%
 #define TOOL_SCENE_GEAR1_LOAD_ON           (3.5f)  // 负载升速电流，单位A
 #define TOOL_SCENE_GEAR1_LOAD_ON_AdcValue   (u16)(TOOL_SCENE_GEAR1_LOAD_ON*CURRENT_ADC_PER_A)
@@ -96,6 +112,10 @@
     TOOL_SCENE_GEAR1_LOAD_ON_MS<1 || TOOL_SCENE_GEAR1_LOAD_ON_MS>60000 || \
     TOOL_SCENE_GEAR1_LOAD_OFF_MS<1 || TOOL_SCENE_GEAR1_LOAD_OFF_MS>60000
 #error "Scene gear 1 requires startup mask in 0..60000 ms and confirmation times in 1..60000 ms."
+#endif
+#if TOOL_SCENE_GEAR2_STOP_MS<1 || TOOL_SCENE_GEAR2_STOP_MS>60000 || \
+    TOOL_SCENE_GEAR3_STOP_MS<1 || TOOL_SCENE_GEAR3_STOP_MS>60000
+#error "Scene screw seating confirmation times must be in 1..60000 ms."
 #endif
 #undef TOOL_MODE_LED_VALID
 #undef TOOL_MODE_DUTY_VALID
@@ -283,19 +303,19 @@
 
 
 
-	#define IBus_Smart_Peak_OCP1                      (25.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP1                      (60.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP1_AdcValue             (u16)(IBus_Smart_Peak_OCP1*CURRENT_ADC_PER_A)
-	#define IBus_Smart_Peak_OCP1_MS                   (120) //ms
+	#define IBus_Smart_Peak_OCP1_MS                   (800) //ms
 	#define IBus_Smart_OCP1_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP1_MS*SLOWLOOP_FRE/1000.0f))
 
-	#define IBus_Smart_Peak_OCP2                      (30.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP2                      (70.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP2_AdcValue             (u16)(IBus_Smart_Peak_OCP2*CURRENT_ADC_PER_A)
-	#define IBus_Smart_Peak_OCP2_MS                   (50) //ms
+	#define IBus_Smart_Peak_OCP2_MS                   (100) //ms
 	#define IBus_Smart_OCP2_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP2_MS*SLOWLOOP_FRE/1000.0f))
 		
-	#define IBus_Smart_Peak_OCP3                      (40.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP3                      (80.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP3_AdcValue             (u16)(IBus_Smart_Peak_OCP3*CURRENT_ADC_PER_A)
-	#define IBus_Smart_Peak_OCP3_MS                   (20) //ms
+	#define IBus_Smart_Peak_OCP3_MS                   (10) //ms
 	#define IBus_Smart_OCP3_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP3_MS*SLOWLOOP_FRE/1000.0f))
 	
 	#define IBus_Smart_REC_MS                         80

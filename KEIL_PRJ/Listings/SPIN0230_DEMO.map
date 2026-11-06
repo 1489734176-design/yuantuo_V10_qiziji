@@ -41,6 +41,7 @@ Section Cross References
     main.o(.text.main) refers to tool_mode.o(.text.tool_mode_key_handle) for tool_mode_key_handle
     main.o(.text.main) refers to user_control.o(.text.pwm_duty_aim_deal) for pwm_duty_aim_deal
     main.o(.text.main) refers to user_control.o(.text.user_gears_handle) for user_gears_handle
+    main.o(.text.main) refers to user_control.o(.text.user_screw_seat_stop_handle) for user_screw_seat_stop_handle
     main.o(.text.main) refers to user_control.o(.text.user_state_control) for user_state_control
     main.o(.text.main) refers to led.o(.text.UO_Led_Handler) for UO_Led_Handler
     main.o(.text.main) refers to led.o(.text.led_tm1650_handle) for led_tm1650_handle
@@ -315,6 +316,15 @@ Section Cross References
     user_control.o(.text.user_gears_handle) refers to tool_mode.o(.text.tool_mode_duty) for tool_mode_duty
     user_control.o(.text.user_gears_handle) refers to motor_control.o(.bss.motor_control_list) for motor_control_list
     user_control.o(.ARM.exidx.text.user_gears_handle) refers to user_control.o(.text.user_gears_handle) for [Anonymous Symbol]
+    user_control.o(.text.user_screw_seat_stop_handle) refers to tool_mode.o(.text.tool_mode_current) for tool_mode_current
+    user_control.o(.text.user_screw_seat_stop_handle) refers to tool_mode.o(.bss.tool_mode_list) for tool_mode_list
+    user_control.o(.text.user_screw_seat_stop_handle) refers to user_control.o(.bss.user_list) for user_list
+    user_control.o(.text.user_screw_seat_stop_handle) refers to mc_core.o(.bss) for mc_core_list
+    user_control.o(.text.user_screw_seat_stop_handle) refers to motor_control.o(.bss.motor_control_list) for motor_control_list
+    user_control.o(.text.user_screw_seat_stop_handle) refers to user_control.o(.bss.machine_error_hold) for machine_error_hold
+    user_control.o(.text.user_screw_seat_stop_handle) refers to user_control.o(.bss.user_screw_seat_stop_handle.seat_stop_gear) for [Anonymous Symbol]
+    user_control.o(.text.user_screw_seat_stop_handle) refers to user_control.o(.bss.user_screw_seat_stop_handle.seat_stop_count) for [Anonymous Symbol]
+    user_control.o(.ARM.exidx.text.user_screw_seat_stop_handle) refers to user_control.o(.text.user_screw_seat_stop_handle) for [Anonymous Symbol]
     user_control.o(.text.user_WrenchKey_Handler) refers to flash_data_save.o(.text.save_user_data) for save_user_data
     user_control.o(.text.user_WrenchKey_Handler) refers to user_control.o(.bss.user_list) for user_list
     user_control.o(.text.user_WrenchKey_Handler) refers to user_control.o(.bss.key_scan.key_count) for [Anonymous Symbol]
@@ -1340,6 +1350,7 @@ Removing Unused input sections from the image.
     Removing user_control.o(.text.pulse_th_handle), (60 bytes).
     Removing user_control.o(.ARM.exidx.text.pulse_th_handle), (8 bytes).
     Removing user_control.o(.ARM.exidx.text.user_gears_handle), (8 bytes).
+    Removing user_control.o(.ARM.exidx.text.user_screw_seat_stop_handle), (8 bytes).
     Removing user_control.o(.text.user_WrenchKey_Handler), (392 bytes).
     Removing user_control.o(.ARM.exidx.text.user_WrenchKey_Handler), (8 bytes).
     Removing user_control.o(.ARM.exidx.text.motor_on_off_control), (8 bytes).
@@ -2044,7 +2055,7 @@ Removing Unused input sections from the image.
     Removing mc_core.o(.rev16_text), (4 bytes).
     Removing mc_core.o(.revsh_text), (4 bytes).
 
-810 unused section(s) (total 15674 bytes) removed from the image.
+811 unused section(s) (total 15682 bytes) removed from the image.
 
 ==============================================================================
 
@@ -2509,9 +2520,9 @@ Image Symbol Table
     [Anonymous Symbol]                       0x0800411c   Section        0  drv_pwm.o(.text.WL_HOffLOn)
     __arm_cp.15_0                            0x08004150   Number         4  drv_pwm.o(.text.WL_HOffLOn)
     [Anonymous Symbol]                       0x08004154   Section        0  user_control.o(.text.error_hold_updata)
-    __arm_cp.14_0                            0x0800416c   Number         4  user_control.o(.text.error_hold_updata)
-    __arm_cp.14_1                            0x08004170   Number         4  user_control.o(.text.error_hold_updata)
-    __arm_cp.14_2                            0x08004174   Number         4  user_control.o(.text.error_hold_updata)
+    __arm_cp.15_0                            0x0800416c   Number         4  user_control.o(.text.error_hold_updata)
+    __arm_cp.15_1                            0x08004170   Number         4  user_control.o(.text.error_hold_updata)
+    __arm_cp.15_2                            0x08004174   Number         4  user_control.o(.text.error_hold_updata)
     flash_find_latest                        0x08004179   Thumb Code   196  flash_data_save.o(.text.flash_find_latest)
     [Anonymous Symbol]                       0x08004178   Section        0  flash_data_save.o(.text.flash_find_latest)
     __arm_cp.2_0                             0x0800423c   Number         4  flash_data_save.o(.text.flash_find_latest)
@@ -2535,159 +2546,166 @@ Image Symbol Table
     __arm_cp.6_0                             0x080043e0   Number         4  led.o(.text.led_tm1650_handle)
     __arm_cp.6_1                             0x080043e4   Number         4  led.o(.text.led_tm1650_handle)
     [Anonymous Symbol]                       0x080043e8   Section        0  main.o(.text.main)
-    __arm_cp.2_0                             0x0800457c   Number         4  main.o(.text.main)
-    __arm_cp.2_1                             0x08004580   Number         4  main.o(.text.main)
-    __arm_cp.2_2                             0x08004584   Number         4  main.o(.text.main)
-    __arm_cp.2_3                             0x08004588   Number         4  main.o(.text.main)
-    __arm_cp.2_5                             0x0800458c   Number         4  main.o(.text.main)
-    __arm_cp.2_6                             0x08004590   Number         4  main.o(.text.main)
-    __arm_cp.2_7                             0x08004594   Number         4  main.o(.text.main)
-    [Anonymous Symbol]                       0x08004598   Section        0  motor_control.o(.text.mc_init)
-    __arm_cp.0_0                             0x08004640   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_1                             0x08004644   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_2                             0x08004648   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_3                             0x0800464c   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_4                             0x08004650   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_5                             0x08004654   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_6                             0x08004658   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_7                             0x0800465c   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_9                             0x08004660   Number         4  motor_control.o(.text.mc_init)
-    __arm_cp.0_10                            0x08004664   Number         4  motor_control.o(.text.mc_init)
-    [Anonymous Symbol]                       0x08004668   Section        0  motor_control.o(.text.mos_check_current)
-    __arm_cp.4_1                             0x08004734   Number         4  motor_control.o(.text.mos_check_current)
-    __arm_cp.4_2                             0x08004738   Number         4  motor_control.o(.text.mos_check_current)
-    __arm_cp.4_3                             0x0800473c   Number         4  motor_control.o(.text.mos_check_current)
-    __arm_cp.4_4                             0x08004740   Number         4  motor_control.o(.text.mos_check_current)
-    [Anonymous Symbol]                       0x08004744   Section        0  motor_control.o(.text.mose_check)
-    __arm_cp.5_0                             0x08004850   Number         4  motor_control.o(.text.mose_check)
-    __arm_cp.5_1                             0x08004854   Number         4  motor_control.o(.text.mose_check)
-    __arm_cp.5_2                             0x08004858   Number         4  motor_control.o(.text.mose_check)
-    [Anonymous Symbol]                       0x0800485c   Section        0  motor_control.o(.text.motor_block_detect)
-    __arm_cp.1_1                             0x08004964   Number         4  motor_control.o(.text.motor_block_detect)
-    __arm_cp.1_2                             0x08004968   Number         4  motor_control.o(.text.motor_block_detect)
-    __arm_cp.1_3                             0x0800496c   Number         4  motor_control.o(.text.motor_block_detect)
-    __arm_cp.1_4                             0x08004970   Number         4  motor_control.o(.text.motor_block_detect)
-    [Anonymous Symbol]                       0x08004974   Section        0  user_control.o(.text.motor_on_off_control)
-    __arm_cp.13_0                            0x080049c8   Number         4  user_control.o(.text.motor_on_off_control)
-    __arm_cp.13_1                            0x080049cc   Number         4  user_control.o(.text.motor_on_off_control)
-    __arm_cp.13_2                            0x080049d0   Number         4  user_control.o(.text.motor_on_off_control)
-    __arm_cp.13_3                            0x080049d4   Number         4  user_control.o(.text.motor_on_off_control)
-    [Anonymous Symbol]                       0x080049d8   Section        0  user_control.o(.text.pwm_duty_aim_deal)
-    __arm_cp.9_0                             0x08004a1c   Number         4  user_control.o(.text.pwm_duty_aim_deal)
-    __arm_cp.9_2                             0x08004a20   Number         4  user_control.o(.text.pwm_duty_aim_deal)
-    __arm_cp.9_3                             0x08004a24   Number         4  user_control.o(.text.pwm_duty_aim_deal)
-    __arm_cp.9_4                             0x08004a28   Number         4  user_control.o(.text.pwm_duty_aim_deal)
-    __arm_cp.9_5                             0x08004a2c   Number         4  user_control.o(.text.pwm_duty_aim_deal)
-    [Anonymous Symbol]                       0x08004a30   Section        0  motor_control.o(.text.pwm_set)
-    __arm_cp.2_0                             0x08004b08   Number         4  motor_control.o(.text.pwm_set)
-    __arm_cp.2_1                             0x08004b0c   Number         4  motor_control.o(.text.pwm_set)
-    __arm_cp.2_2                             0x08004b10   Number         4  motor_control.o(.text.pwm_set)
-    __arm_cp.2_3                             0x08004b14   Number         4  motor_control.o(.text.pwm_set)
-    __arm_cp.2_4                             0x08004b18   Number         4  motor_control.o(.text.pwm_set)
-    __arm_cp.2_5                             0x08004b1c   Number         4  motor_control.o(.text.pwm_set)
-    __arm_cp.2_6                             0x08004b20   Number         4  motor_control.o(.text.pwm_set)
-    __arm_cp.2_7                             0x08004b24   Number         4  motor_control.o(.text.pwm_set)
-    [Anonymous Symbol]                       0x08004b28   Section        0  flash_data_save.o(.text.read_user_data)
-    __arm_cp.5_1                             0x08004b74   Number         4  flash_data_save.o(.text.read_user_data)
-    [Anonymous Symbol]                       0x08004b78   Section        0  flash_data_save.o(.text.save_user_data_checked)
-    __arm_cp.1_1                             0x08004d78   Number         4  flash_data_save.o(.text.save_user_data_checked)
-    __arm_cp.1_2                             0x08004d7c   Number         4  flash_data_save.o(.text.save_user_data_checked)
-    __arm_cp.1_3                             0x08004d80   Number         4  flash_data_save.o(.text.save_user_data_checked)
-    __arm_cp.1_4                             0x08004d84   Number         4  flash_data_save.o(.text.save_user_data_checked)
-    __arm_cp.1_5                             0x08004d88   Number         4  flash_data_save.o(.text.save_user_data_checked)
-    __arm_cp.1_6                             0x08004d8c   Number         4  flash_data_save.o(.text.save_user_data_checked)
-    [Anonymous Symbol]                       0x08004d90   Section        0  drv_comp.o(.text.select_comp_ch_for_sector)
-    __arm_cp.0_0                             0x08004ddc   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
-    __arm_cp.0_1                             0x08004de0   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
-    __arm_cp.0_2                             0x08004de4   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
-    __arm_cp.0_3                             0x08004de8   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
-    __arm_cp.0_4                             0x08004dec   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
-    [Anonymous Symbol]                       0x08004df0   Section        0  systick.o(.text.systick_delay_us)
-    __arm_cp.9_0                             0x08004e10   Number         4  systick.o(.text.systick_delay_us)
-    [Anonymous Symbol]                       0x08004e14   Section        0  tool_mode.o(.text.tool_mode_current)
-    __arm_cp.1_0                             0x08004e20   Number         4  tool_mode.o(.text.tool_mode_current)
-    [Anonymous Symbol]                       0x08004e24   Section        0  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_0                             0x08005058   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_1                             0x0800505c   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_2                             0x08005060   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_3                             0x08005064   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_4                             0x08005068   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_5                             0x0800506c   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_6                             0x08005070   Number         4  tool_mode.o(.text.tool_mode_duty)
-    tool_mode_duty.speed_percent             0x08005074   Number         0  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_8                             0x08005078   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_9                             0x0800507c   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_10                            0x08005080   Number         4  tool_mode.o(.text.tool_mode_duty)
-    tool_mode_duty.scene_percent             0x08005084   Number         0  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_13                            0x08005088   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_14                            0x0800508c   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_15                            0x08005090   Number         4  tool_mode.o(.text.tool_mode_duty)
-    __arm_cp.9_18                            0x08005094   Number         4  tool_mode.o(.text.tool_mode_duty)
-    [Anonymous Symbol]                       0x08005098   Section        0  tool_mode.o(.text.tool_mode_gear)
-    [Anonymous Symbol]                       0x080050bc   Section        0  tool_mode.o(.text.tool_mode_init)
-    [Anonymous Symbol]                       0x08005110   Section        0  tool_mode.o(.text.tool_mode_key_event)
-    __arm_cp.6_0                             0x080051b4   Number         4  tool_mode.o(.text.tool_mode_key_event)
-    __arm_cp.6_1                             0x080051b8   Number         4  tool_mode.o(.text.tool_mode_key_event)
-    [Anonymous Symbol]                       0x080051bc   Section        0  tool_mode.o(.text.tool_mode_key_handle)
-    __arm_cp.7_0                             0x0800527c   Number         4  tool_mode.o(.text.tool_mode_key_handle)
-    __arm_cp.7_1                             0x08005280   Number         4  tool_mode.o(.text.tool_mode_key_handle)
-    __arm_cp.7_2                             0x08005284   Number         4  tool_mode.o(.text.tool_mode_key_handle)
-    __arm_cp.7_3                             0x08005288   Number         4  tool_mode.o(.text.tool_mode_key_handle)
-    __arm_cp.7_4                             0x0800528c   Number         4  tool_mode.o(.text.tool_mode_key_handle)
-    __arm_cp.7_5                             0x08005290   Number         4  tool_mode.o(.text.tool_mode_key_handle)
-    __arm_cp.7_6                             0x08005294   Number         4  tool_mode.o(.text.tool_mode_key_handle)
-    [Anonymous Symbol]                       0x08005298   Section        0  tool_mode.o(.text.tool_mode_pwm_update)
-    __arm_cp.8_5                             0x080052fc   Number         4  tool_mode.o(.text.tool_mode_pwm_update)
-    __arm_cp.8_6                             0x08005300   Number         4  tool_mode.o(.text.tool_mode_pwm_update)
-    __arm_cp.8_7                             0x08005304   Number         4  tool_mode.o(.text.tool_mode_pwm_update)
-    [Anonymous Symbol]                       0x08005308   Section        0  tool_mode.o(.text.tool_mode_restore_direction)
-    [Anonymous Symbol]                       0x08005354   Section        0  tool_mode.o(.text.tool_mode_save_handle)
-    __arm_cp.10_0                            0x08005390   Number         4  tool_mode.o(.text.tool_mode_save_handle)
-    [Anonymous Symbol]                       0x08005394   Section        0  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_0                             0x08005408   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_1                             0x0800540c   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_2                             0x08005410   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_3                             0x08005414   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_4                             0x08005418   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_5                             0x0800541c   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_6                             0x08005420   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    __arm_cp.4_7                             0x08005424   Number         4  tool_mode.o(.text.tool_mode_set_direction)
-    [Anonymous Symbol]                       0x08005428   Section        0  tool_mode.o(.text.tool_mode_tick_1ms)
-    __arm_cp.5_0                             0x08005434   Number         4  tool_mode.o(.text.tool_mode_tick_1ms)
-    [Anonymous Symbol]                       0x08005438   Section        0  user_control.o(.text.user_direction_handle)
-    __arm_cp.7_0                             0x08005534   Number         4  user_control.o(.text.user_direction_handle)
-    __arm_cp.7_1                             0x08005538   Number         4  user_control.o(.text.user_direction_handle)
-    __arm_cp.7_2                             0x0800553c   Number         4  user_control.o(.text.user_direction_handle)
-    __arm_cp.7_3                             0x08005540   Number         4  user_control.o(.text.user_direction_handle)
-    __arm_cp.7_5                             0x08005544   Number         4  user_control.o(.text.user_direction_handle)
-    [Anonymous Symbol]                       0x08005548   Section        0  user_control.o(.text.user_gears_handle)
-    __arm_cp.11_0                            0x08005558   Number         4  user_control.o(.text.user_gears_handle)
-    [Anonymous Symbol]                       0x0800555c   Section        0  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_1                             0x08005758   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_2                             0x0800575c   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_3                             0x08005760   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_4                             0x08005764   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_5                             0x08005768   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_6                             0x0800576c   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_7                             0x08005770   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_8                             0x08005774   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_9                             0x08005778   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_10                            0x0800577c   Number         4  user_control.o(.text.user_oc_handle)
-    __arm_cp.2_11                            0x08005780   Number         4  user_control.o(.text.user_oc_handle)
-    [Anonymous Symbol]                       0x08005784   Section        0  user_control.o(.text.user_para_init)
-    __arm_cp.1_0                             0x080057b4   Number         4  user_control.o(.text.user_para_init)
-    [Anonymous Symbol]                       0x080057b8   Section        0  user_control.o(.text.user_state_control)
-    __arm_cp.15_0                            0x0800599c   Number         4  user_control.o(.text.user_state_control)
-    __arm_cp.15_1                            0x080059a0   Number         4  user_control.o(.text.user_state_control)
-    __arm_cp.15_2                            0x080059a4   Number         4  user_control.o(.text.user_state_control)
-    __arm_cp.15_3                            0x080059a8   Number         4  user_control.o(.text.user_state_control)
-    __arm_cp.15_4                            0x080059ac   Number         4  user_control.o(.text.user_state_control)
-    __arm_cp.15_5                            0x080059b0   Number         4  user_control.o(.text.user_state_control)
-    __arm_cp.15_6                            0x080059b4   Number         4  user_control.o(.text.user_state_control)
-    [Anonymous Symbol]                       0x080059b8   Section        0  mc_core.o(i.__ARM_common_switch8)
-    i.__scatterload_copy                     0x080059d2   Section       14  handlers.o(i.__scatterload_copy)
-    i.__scatterload_null                     0x080059e0   Section        2  handlers.o(i.__scatterload_null)
-    i.__scatterload_zeroinit                 0x080059e2   Section       14  handlers.o(i.__scatterload_zeroinit)
+    __arm_cp.2_0                             0x08004580   Number         4  main.o(.text.main)
+    __arm_cp.2_1                             0x08004584   Number         4  main.o(.text.main)
+    __arm_cp.2_2                             0x08004588   Number         4  main.o(.text.main)
+    __arm_cp.2_3                             0x0800458c   Number         4  main.o(.text.main)
+    __arm_cp.2_5                             0x08004590   Number         4  main.o(.text.main)
+    __arm_cp.2_6                             0x08004594   Number         4  main.o(.text.main)
+    __arm_cp.2_7                             0x08004598   Number         4  main.o(.text.main)
+    [Anonymous Symbol]                       0x0800459c   Section        0  motor_control.o(.text.mc_init)
+    __arm_cp.0_0                             0x08004644   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_1                             0x08004648   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_2                             0x0800464c   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_3                             0x08004650   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_4                             0x08004654   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_5                             0x08004658   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_6                             0x0800465c   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_7                             0x08004660   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_9                             0x08004664   Number         4  motor_control.o(.text.mc_init)
+    __arm_cp.0_10                            0x08004668   Number         4  motor_control.o(.text.mc_init)
+    [Anonymous Symbol]                       0x0800466c   Section        0  motor_control.o(.text.mos_check_current)
+    __arm_cp.4_1                             0x08004738   Number         4  motor_control.o(.text.mos_check_current)
+    __arm_cp.4_2                             0x0800473c   Number         4  motor_control.o(.text.mos_check_current)
+    __arm_cp.4_3                             0x08004740   Number         4  motor_control.o(.text.mos_check_current)
+    __arm_cp.4_4                             0x08004744   Number         4  motor_control.o(.text.mos_check_current)
+    [Anonymous Symbol]                       0x08004748   Section        0  motor_control.o(.text.mose_check)
+    __arm_cp.5_0                             0x08004854   Number         4  motor_control.o(.text.mose_check)
+    __arm_cp.5_1                             0x08004858   Number         4  motor_control.o(.text.mose_check)
+    __arm_cp.5_2                             0x0800485c   Number         4  motor_control.o(.text.mose_check)
+    [Anonymous Symbol]                       0x08004860   Section        0  motor_control.o(.text.motor_block_detect)
+    __arm_cp.1_1                             0x08004968   Number         4  motor_control.o(.text.motor_block_detect)
+    __arm_cp.1_2                             0x0800496c   Number         4  motor_control.o(.text.motor_block_detect)
+    __arm_cp.1_3                             0x08004970   Number         4  motor_control.o(.text.motor_block_detect)
+    __arm_cp.1_4                             0x08004974   Number         4  motor_control.o(.text.motor_block_detect)
+    [Anonymous Symbol]                       0x08004978   Section        0  user_control.o(.text.motor_on_off_control)
+    __arm_cp.14_0                            0x080049cc   Number         4  user_control.o(.text.motor_on_off_control)
+    __arm_cp.14_1                            0x080049d0   Number         4  user_control.o(.text.motor_on_off_control)
+    __arm_cp.14_2                            0x080049d4   Number         4  user_control.o(.text.motor_on_off_control)
+    __arm_cp.14_3                            0x080049d8   Number         4  user_control.o(.text.motor_on_off_control)
+    [Anonymous Symbol]                       0x080049dc   Section        0  user_control.o(.text.pwm_duty_aim_deal)
+    __arm_cp.9_0                             0x08004a20   Number         4  user_control.o(.text.pwm_duty_aim_deal)
+    __arm_cp.9_2                             0x08004a24   Number         4  user_control.o(.text.pwm_duty_aim_deal)
+    __arm_cp.9_3                             0x08004a28   Number         4  user_control.o(.text.pwm_duty_aim_deal)
+    __arm_cp.9_4                             0x08004a2c   Number         4  user_control.o(.text.pwm_duty_aim_deal)
+    __arm_cp.9_5                             0x08004a30   Number         4  user_control.o(.text.pwm_duty_aim_deal)
+    [Anonymous Symbol]                       0x08004a34   Section        0  motor_control.o(.text.pwm_set)
+    __arm_cp.2_0                             0x08004b0c   Number         4  motor_control.o(.text.pwm_set)
+    __arm_cp.2_1                             0x08004b10   Number         4  motor_control.o(.text.pwm_set)
+    __arm_cp.2_2                             0x08004b14   Number         4  motor_control.o(.text.pwm_set)
+    __arm_cp.2_3                             0x08004b18   Number         4  motor_control.o(.text.pwm_set)
+    __arm_cp.2_4                             0x08004b1c   Number         4  motor_control.o(.text.pwm_set)
+    __arm_cp.2_5                             0x08004b20   Number         4  motor_control.o(.text.pwm_set)
+    __arm_cp.2_6                             0x08004b24   Number         4  motor_control.o(.text.pwm_set)
+    __arm_cp.2_7                             0x08004b28   Number         4  motor_control.o(.text.pwm_set)
+    [Anonymous Symbol]                       0x08004b2c   Section        0  flash_data_save.o(.text.read_user_data)
+    __arm_cp.5_1                             0x08004b78   Number         4  flash_data_save.o(.text.read_user_data)
+    [Anonymous Symbol]                       0x08004b7c   Section        0  flash_data_save.o(.text.save_user_data_checked)
+    __arm_cp.1_1                             0x08004d7c   Number         4  flash_data_save.o(.text.save_user_data_checked)
+    __arm_cp.1_2                             0x08004d80   Number         4  flash_data_save.o(.text.save_user_data_checked)
+    __arm_cp.1_3                             0x08004d84   Number         4  flash_data_save.o(.text.save_user_data_checked)
+    __arm_cp.1_4                             0x08004d88   Number         4  flash_data_save.o(.text.save_user_data_checked)
+    __arm_cp.1_5                             0x08004d8c   Number         4  flash_data_save.o(.text.save_user_data_checked)
+    __arm_cp.1_6                             0x08004d90   Number         4  flash_data_save.o(.text.save_user_data_checked)
+    [Anonymous Symbol]                       0x08004d94   Section        0  drv_comp.o(.text.select_comp_ch_for_sector)
+    __arm_cp.0_0                             0x08004de0   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
+    __arm_cp.0_1                             0x08004de4   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
+    __arm_cp.0_2                             0x08004de8   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
+    __arm_cp.0_3                             0x08004dec   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
+    __arm_cp.0_4                             0x08004df0   Number         4  drv_comp.o(.text.select_comp_ch_for_sector)
+    [Anonymous Symbol]                       0x08004df4   Section        0  systick.o(.text.systick_delay_us)
+    __arm_cp.9_0                             0x08004e14   Number         4  systick.o(.text.systick_delay_us)
+    [Anonymous Symbol]                       0x08004e18   Section        0  tool_mode.o(.text.tool_mode_current)
+    __arm_cp.1_0                             0x08004e24   Number         4  tool_mode.o(.text.tool_mode_current)
+    [Anonymous Symbol]                       0x08004e28   Section        0  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_0                             0x0800505c   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_1                             0x08005060   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_2                             0x08005064   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_3                             0x08005068   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_4                             0x0800506c   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_5                             0x08005070   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_6                             0x08005074   Number         4  tool_mode.o(.text.tool_mode_duty)
+    tool_mode_duty.speed_percent             0x08005078   Number         0  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_8                             0x0800507c   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_9                             0x08005080   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_10                            0x08005084   Number         4  tool_mode.o(.text.tool_mode_duty)
+    tool_mode_duty.scene_percent             0x08005088   Number         0  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_13                            0x0800508c   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_14                            0x08005090   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_15                            0x08005094   Number         4  tool_mode.o(.text.tool_mode_duty)
+    __arm_cp.9_18                            0x08005098   Number         4  tool_mode.o(.text.tool_mode_duty)
+    [Anonymous Symbol]                       0x0800509c   Section        0  tool_mode.o(.text.tool_mode_gear)
+    [Anonymous Symbol]                       0x080050c0   Section        0  tool_mode.o(.text.tool_mode_init)
+    [Anonymous Symbol]                       0x08005114   Section        0  tool_mode.o(.text.tool_mode_key_event)
+    __arm_cp.6_0                             0x080051b8   Number         4  tool_mode.o(.text.tool_mode_key_event)
+    __arm_cp.6_1                             0x080051bc   Number         4  tool_mode.o(.text.tool_mode_key_event)
+    [Anonymous Symbol]                       0x080051c0   Section        0  tool_mode.o(.text.tool_mode_key_handle)
+    __arm_cp.7_0                             0x08005280   Number         4  tool_mode.o(.text.tool_mode_key_handle)
+    __arm_cp.7_1                             0x08005284   Number         4  tool_mode.o(.text.tool_mode_key_handle)
+    __arm_cp.7_2                             0x08005288   Number         4  tool_mode.o(.text.tool_mode_key_handle)
+    __arm_cp.7_3                             0x0800528c   Number         4  tool_mode.o(.text.tool_mode_key_handle)
+    __arm_cp.7_4                             0x08005290   Number         4  tool_mode.o(.text.tool_mode_key_handle)
+    __arm_cp.7_5                             0x08005294   Number         4  tool_mode.o(.text.tool_mode_key_handle)
+    __arm_cp.7_6                             0x08005298   Number         4  tool_mode.o(.text.tool_mode_key_handle)
+    [Anonymous Symbol]                       0x0800529c   Section        0  tool_mode.o(.text.tool_mode_pwm_update)
+    __arm_cp.8_5                             0x08005300   Number         4  tool_mode.o(.text.tool_mode_pwm_update)
+    __arm_cp.8_6                             0x08005304   Number         4  tool_mode.o(.text.tool_mode_pwm_update)
+    __arm_cp.8_7                             0x08005308   Number         4  tool_mode.o(.text.tool_mode_pwm_update)
+    [Anonymous Symbol]                       0x0800530c   Section        0  tool_mode.o(.text.tool_mode_restore_direction)
+    [Anonymous Symbol]                       0x08005358   Section        0  tool_mode.o(.text.tool_mode_save_handle)
+    __arm_cp.10_0                            0x08005394   Number         4  tool_mode.o(.text.tool_mode_save_handle)
+    [Anonymous Symbol]                       0x08005398   Section        0  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_0                             0x0800540c   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_1                             0x08005410   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_2                             0x08005414   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_3                             0x08005418   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_4                             0x0800541c   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_5                             0x08005420   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_6                             0x08005424   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    __arm_cp.4_7                             0x08005428   Number         4  tool_mode.o(.text.tool_mode_set_direction)
+    [Anonymous Symbol]                       0x0800542c   Section        0  tool_mode.o(.text.tool_mode_tick_1ms)
+    __arm_cp.5_0                             0x08005438   Number         4  tool_mode.o(.text.tool_mode_tick_1ms)
+    [Anonymous Symbol]                       0x0800543c   Section        0  user_control.o(.text.user_direction_handle)
+    __arm_cp.7_0                             0x08005538   Number         4  user_control.o(.text.user_direction_handle)
+    __arm_cp.7_1                             0x0800553c   Number         4  user_control.o(.text.user_direction_handle)
+    __arm_cp.7_2                             0x08005540   Number         4  user_control.o(.text.user_direction_handle)
+    __arm_cp.7_3                             0x08005544   Number         4  user_control.o(.text.user_direction_handle)
+    __arm_cp.7_5                             0x08005548   Number         4  user_control.o(.text.user_direction_handle)
+    [Anonymous Symbol]                       0x0800554c   Section        0  user_control.o(.text.user_gears_handle)
+    __arm_cp.11_0                            0x0800555c   Number         4  user_control.o(.text.user_gears_handle)
+    [Anonymous Symbol]                       0x08005560   Section        0  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_1                             0x08005768   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_2                             0x0800576c   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_3                             0x08005770   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_4                             0x08005774   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_5                             0x08005778   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_6                             0x0800577c   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_7                             0x08005780   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_8                             0x08005784   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_9                             0x08005788   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_10                            0x0800578c   Number         4  user_control.o(.text.user_oc_handle)
+    __arm_cp.2_11                            0x08005790   Number         4  user_control.o(.text.user_oc_handle)
+    [Anonymous Symbol]                       0x08005794   Section        0  user_control.o(.text.user_para_init)
+    __arm_cp.1_0                             0x080057c4   Number         4  user_control.o(.text.user_para_init)
+    [Anonymous Symbol]                       0x080057c8   Section        0  user_control.o(.text.user_screw_seat_stop_handle)
+    __arm_cp.12_0                            0x08005898   Number         4  user_control.o(.text.user_screw_seat_stop_handle)
+    __arm_cp.12_1                            0x0800589c   Number         4  user_control.o(.text.user_screw_seat_stop_handle)
+    __arm_cp.12_2                            0x080058a0   Number         4  user_control.o(.text.user_screw_seat_stop_handle)
+    __arm_cp.12_3                            0x080058a4   Number         4  user_control.o(.text.user_screw_seat_stop_handle)
+    __arm_cp.12_5                            0x080058a8   Number         4  user_control.o(.text.user_screw_seat_stop_handle)
+    __arm_cp.12_6                            0x080058ac   Number         4  user_control.o(.text.user_screw_seat_stop_handle)
+    [Anonymous Symbol]                       0x080058b0   Section        0  user_control.o(.text.user_state_control)
+    __arm_cp.16_0                            0x08005a94   Number         4  user_control.o(.text.user_state_control)
+    __arm_cp.16_1                            0x08005a98   Number         4  user_control.o(.text.user_state_control)
+    __arm_cp.16_2                            0x08005a9c   Number         4  user_control.o(.text.user_state_control)
+    __arm_cp.16_3                            0x08005aa0   Number         4  user_control.o(.text.user_state_control)
+    __arm_cp.16_4                            0x08005aa4   Number         4  user_control.o(.text.user_state_control)
+    __arm_cp.16_5                            0x08005aa8   Number         4  user_control.o(.text.user_state_control)
+    __arm_cp.16_6                            0x08005aac   Number         4  user_control.o(.text.user_state_control)
+    [Anonymous Symbol]                       0x08005ab0   Section        0  mc_core.o(i.__ARM_common_switch8)
+    i.__scatterload_copy                     0x08005aca   Section       14  handlers.o(i.__scatterload_copy)
+    i.__scatterload_null                     0x08005ad8   Section        2  handlers.o(i.__scatterload_null)
+    i.__scatterload_zeroinit                 0x08005ada   Section       14  handlers.o(i.__scatterload_zeroinit)
     [Anonymous Symbol]                       0x20000000   Section       52  mc_core.o(.data)
     [Anonymous Symbol]                       0x20000004   Data          24  mc_core.o(.data)
     [Anonymous Symbol]                       0x2000001c   Data          24  mc_core.o(.data)
@@ -2800,7 +2818,11 @@ Image Symbol Table
     [Anonymous Symbol]                       0x2000027c   Section        0  user_control.o(.bss.user_oc_handle.IBusAvg_rec_count)
     user_oc_handle.IBusPeakOCP1_count        0x2000027e   Data           2  user_control.o(.bss.user_oc_handle.IBusPeakOCP1_count)
     [Anonymous Symbol]                       0x2000027e   Section        0  user_control.o(.bss.user_oc_handle.IBusPeakOCP1_count)
-    STACK                                    0x20000280   Section     1024  startup_mm32spin0230_keil.o(STACK)
+    user_screw_seat_stop_handle.seat_stop_count 0x20000280   Data           2  user_control.o(.bss.user_screw_seat_stop_handle.seat_stop_count)
+    [Anonymous Symbol]                       0x20000280   Section        0  user_control.o(.bss.user_screw_seat_stop_handle.seat_stop_count)
+    user_screw_seat_stop_handle.seat_stop_gear 0x20000282   Data           1  user_control.o(.bss.user_screw_seat_stop_handle.seat_stop_gear)
+    [Anonymous Symbol]                       0x20000282   Section        0  user_control.o(.bss.user_screw_seat_stop_handle.seat_stop_gear)
+    STACK                                    0x20000288   Section     1024  startup_mm32spin0230_keil.o(STACK)
 
     Global Symbols
 
@@ -3019,40 +3041,41 @@ Image Symbol Table
     error_hold_updata                        0x08004155   Thumb Code    24  user_control.o(.text.error_hold_updata)
     led_init                                 0x0800432d   Thumb Code   116  led.o(.text.led_init)
     led_tm1650_handle                        0x080043b9   Thumb Code    40  led.o(.text.led_tm1650_handle)
-    main                                     0x080043e9   Thumb Code   404  main.o(.text.main)
-    mc_init                                  0x08004599   Thumb Code   168  motor_control.o(.text.mc_init)
-    mos_check_current                        0x08004669   Thumb Code   204  motor_control.o(.text.mos_check_current)
-    mose_check                               0x08004745   Thumb Code   268  motor_control.o(.text.mose_check)
-    motor_block_detect                       0x0800485d   Thumb Code   264  motor_control.o(.text.motor_block_detect)
-    motor_on_off_control                     0x08004975   Thumb Code    84  user_control.o(.text.motor_on_off_control)
-    pwm_duty_aim_deal                        0x080049d9   Thumb Code    68  user_control.o(.text.pwm_duty_aim_deal)
-    pwm_set                                  0x08004a31   Thumb Code   216  motor_control.o(.text.pwm_set)
-    read_user_data                           0x08004b29   Thumb Code    76  flash_data_save.o(.text.read_user_data)
-    save_user_data_checked                   0x08004b79   Thumb Code   512  flash_data_save.o(.text.save_user_data_checked)
-    select_comp_ch_for_sector                0x08004d91   Thumb Code    76  drv_comp.o(.text.select_comp_ch_for_sector)
-    systick_delay_us                         0x08004df1   Thumb Code    32  systick.o(.text.systick_delay_us)
-    tool_mode_current                        0x08004e15   Thumb Code    12  tool_mode.o(.text.tool_mode_current)
-    tool_mode_duty                           0x08004e25   Thumb Code   564  tool_mode.o(.text.tool_mode_duty)
-    tool_mode_gear                           0x08005099   Thumb Code    36  tool_mode.o(.text.tool_mode_gear)
-    tool_mode_init                           0x080050bd   Thumb Code    84  tool_mode.o(.text.tool_mode_init)
-    tool_mode_key_event                      0x08005111   Thumb Code   164  tool_mode.o(.text.tool_mode_key_event)
-    tool_mode_key_handle                     0x080051bd   Thumb Code   192  tool_mode.o(.text.tool_mode_key_handle)
-    tool_mode_pwm_update                     0x08005299   Thumb Code   100  tool_mode.o(.text.tool_mode_pwm_update)
-    tool_mode_restore_direction              0x08005309   Thumb Code    76  tool_mode.o(.text.tool_mode_restore_direction)
-    tool_mode_save_handle                    0x08005355   Thumb Code    60  tool_mode.o(.text.tool_mode_save_handle)
-    tool_mode_set_direction                  0x08005395   Thumb Code   116  tool_mode.o(.text.tool_mode_set_direction)
-    tool_mode_tick_1ms                       0x08005429   Thumb Code    12  tool_mode.o(.text.tool_mode_tick_1ms)
-    user_direction_handle                    0x08005439   Thumb Code   252  user_control.o(.text.user_direction_handle)
-    user_gears_handle                        0x08005549   Thumb Code    16  user_control.o(.text.user_gears_handle)
-    user_oc_handle                           0x0800555d   Thumb Code   508  user_control.o(.text.user_oc_handle)
-    user_para_init                           0x08005785   Thumb Code    48  user_control.o(.text.user_para_init)
-    user_state_control                       0x080057b9   Thumb Code   484  user_control.o(.text.user_state_control)
-    __ARM_common_switch8                     0x080059b9   Thumb Code    26  mc_core.o(i.__ARM_common_switch8)
-    __scatterload_copy                       0x080059d3   Thumb Code    14  handlers.o(i.__scatterload_copy)
-    __scatterload_null                       0x080059e1   Thumb Code     2  handlers.o(i.__scatterload_null)
-    __scatterload_zeroinit                   0x080059e3   Thumb Code    14  handlers.o(i.__scatterload_zeroinit)
-    Region$$Table$$Base                      0x080059f0   Number         0  anon$$obj.o(Region$$Table)
-    Region$$Table$$Limit                     0x08005a10   Number         0  anon$$obj.o(Region$$Table)
+    main                                     0x080043e9   Thumb Code   408  main.o(.text.main)
+    mc_init                                  0x0800459d   Thumb Code   168  motor_control.o(.text.mc_init)
+    mos_check_current                        0x0800466d   Thumb Code   204  motor_control.o(.text.mos_check_current)
+    mose_check                               0x08004749   Thumb Code   268  motor_control.o(.text.mose_check)
+    motor_block_detect                       0x08004861   Thumb Code   264  motor_control.o(.text.motor_block_detect)
+    motor_on_off_control                     0x08004979   Thumb Code    84  user_control.o(.text.motor_on_off_control)
+    pwm_duty_aim_deal                        0x080049dd   Thumb Code    68  user_control.o(.text.pwm_duty_aim_deal)
+    pwm_set                                  0x08004a35   Thumb Code   216  motor_control.o(.text.pwm_set)
+    read_user_data                           0x08004b2d   Thumb Code    76  flash_data_save.o(.text.read_user_data)
+    save_user_data_checked                   0x08004b7d   Thumb Code   512  flash_data_save.o(.text.save_user_data_checked)
+    select_comp_ch_for_sector                0x08004d95   Thumb Code    76  drv_comp.o(.text.select_comp_ch_for_sector)
+    systick_delay_us                         0x08004df5   Thumb Code    32  systick.o(.text.systick_delay_us)
+    tool_mode_current                        0x08004e19   Thumb Code    12  tool_mode.o(.text.tool_mode_current)
+    tool_mode_duty                           0x08004e29   Thumb Code   564  tool_mode.o(.text.tool_mode_duty)
+    tool_mode_gear                           0x0800509d   Thumb Code    36  tool_mode.o(.text.tool_mode_gear)
+    tool_mode_init                           0x080050c1   Thumb Code    84  tool_mode.o(.text.tool_mode_init)
+    tool_mode_key_event                      0x08005115   Thumb Code   164  tool_mode.o(.text.tool_mode_key_event)
+    tool_mode_key_handle                     0x080051c1   Thumb Code   192  tool_mode.o(.text.tool_mode_key_handle)
+    tool_mode_pwm_update                     0x0800529d   Thumb Code   100  tool_mode.o(.text.tool_mode_pwm_update)
+    tool_mode_restore_direction              0x0800530d   Thumb Code    76  tool_mode.o(.text.tool_mode_restore_direction)
+    tool_mode_save_handle                    0x08005359   Thumb Code    60  tool_mode.o(.text.tool_mode_save_handle)
+    tool_mode_set_direction                  0x08005399   Thumb Code   116  tool_mode.o(.text.tool_mode_set_direction)
+    tool_mode_tick_1ms                       0x0800542d   Thumb Code    12  tool_mode.o(.text.tool_mode_tick_1ms)
+    user_direction_handle                    0x0800543d   Thumb Code   252  user_control.o(.text.user_direction_handle)
+    user_gears_handle                        0x0800554d   Thumb Code    16  user_control.o(.text.user_gears_handle)
+    user_oc_handle                           0x08005561   Thumb Code   520  user_control.o(.text.user_oc_handle)
+    user_para_init                           0x08005795   Thumb Code    48  user_control.o(.text.user_para_init)
+    user_screw_seat_stop_handle              0x080057c9   Thumb Code   208  user_control.o(.text.user_screw_seat_stop_handle)
+    user_state_control                       0x080058b1   Thumb Code   484  user_control.o(.text.user_state_control)
+    __ARM_common_switch8                     0x08005ab1   Thumb Code    26  mc_core.o(i.__ARM_common_switch8)
+    __scatterload_copy                       0x08005acb   Thumb Code    14  handlers.o(i.__scatterload_copy)
+    __scatterload_null                       0x08005ad9   Thumb Code     2  handlers.o(i.__scatterload_null)
+    __scatterload_zeroinit                   0x08005adb   Thumb Code    14  handlers.o(i.__scatterload_zeroinit)
+    Region$$Table$$Base                      0x08005ae8   Number         0  anon$$obj.o(Region$$Table)
+    Region$$Table$$Limit                     0x08005b08   Number         0  anon$$obj.o(Region$$Table)
     cross_current_time                       0x20000000   Data           4  mc_core.o(.data)
     Comp_CH_Tab                              0x20000034   Data           6  drv_comp.o(.data.Comp_CH_Tab)
     Comp_CH_Tab1                             0x2000003a   Data           6  drv_comp.o(.data.Comp_CH_Tab1)
@@ -3072,7 +3095,7 @@ Image Symbol Table
     tool_mode_list                           0x2000020b   Data           8  tool_mode.o(.bss.tool_mode_list)
     user_led_control                         0x20000216   Data           8  led.o(.bss.user_led_control)
     user_list                                0x20000220   Data          84  user_control.o(.bss.user_list)
-    __initial_sp                             0x20000680   Data           0  startup_mm32spin0230_keil.o(STACK)
+    __initial_sp                             0x20000688   Data           0  startup_mm32spin0230_keil.o(STACK)
 
 
 
@@ -3082,70 +3105,70 @@ Memory Map of the image
 
   Image Entry point : 0x080000c1
 
-  Load Region LR_IROM1 (Base: 0x08000000, Size: 0x00005a58, Max: 0x00007800, ABSOLUTE)
+  Load Region LR_IROM1 (Base: 0x08000000, Size: 0x00005b50, Max: 0x00007800, ABSOLUTE)
 
-    Execution Region ER_IROM1 (Exec base: 0x08000000, Load base: 0x08000000, Size: 0x00005a10, Max: 0x00007800, ABSOLUTE)
+    Execution Region ER_IROM1 (Exec base: 0x08000000, Load base: 0x08000000, Size: 0x00005b08, Max: 0x00007800, ABSOLUTE)
 
     Exec Addr    Load Addr    Size         Type   Attr      Idx    E Section Name        Object
 
-    0x08000000   0x08000000   0x000000c0   Data   RO         1255    RESET               startup_mm32spin0230_keil.o
-    0x080000c0   0x080000c0   0x00000000   Code   RO         1316  * .ARM.Collect$$$$00000000  mc_p.l(entry.o)
-    0x080000c0   0x080000c0   0x00000004   Code   RO         1347    .ARM.Collect$$$$00000001  mc_p.l(entry2.o)
-    0x080000c4   0x080000c4   0x00000004   Code   RO         1350    .ARM.Collect$$$$00000004  mc_p.l(entry5.o)
-    0x080000c8   0x080000c8   0x00000000   Code   RO         1352    .ARM.Collect$$$$00000008  mc_p.l(entry7b.o)
-    0x080000c8   0x080000c8   0x00000000   Code   RO         1354    .ARM.Collect$$$$0000000A  mc_p.l(entry8b.o)
-    0x080000c8   0x080000c8   0x00000008   Code   RO         1355    .ARM.Collect$$$$0000000B  mc_p.l(entry9a.o)
-    0x080000d0   0x080000d0   0x00000000   Code   RO         1357    .ARM.Collect$$$$0000000D  mc_p.l(entry10a.o)
-    0x080000d0   0x080000d0   0x00000000   Code   RO         1359    .ARM.Collect$$$$0000000F  mc_p.l(entry11a.o)
-    0x080000d0   0x080000d0   0x00000004   Code   RO         1348    .ARM.Collect$$$$00002712  mc_p.l(entry2.o)
-    0x080000d4   0x080000d4   0x00000028   Code   RO         1256    .text               startup_mm32spin0230_keil.o
-    0x080000fc   0x080000fc   0x00000cfc   Code   RO         1308    .text               002_mc_core_V1_01.lib(mc_core.o)
-    0x08000df8   0x08000df8   0x00000024   Code   RO         1325    .text               mc_p.l(memcpya.o)
-    0x08000e1c   0x08000e1c   0x00000024   Code   RO         1327    .text               mc_p.l(memseta.o)
-    0x08000e40   0x08000e40   0x000000b2   Code   RO         1331    .text               mf_p.l(fadd.o)
-    0x08000ef2   0x08000ef2   0x0000007a   Code   RO         1333    .text               mf_p.l(fmul.o)
-    0x08000f6c   0x08000f6c   0x0000007c   Code   RO         1335    .text               mf_p.l(fdiv.o)
-    0x08000fe8   0x08000fe8   0x00000018   Code   RO         1337    .text               mf_p.l(fscalb.o)
-    0x08001000   0x08001000   0x00000016   Code   RO         1339    .text               mf_p.l(fflti.o)
-    0x08001016   0x08001016   0x0000000e   Code   RO         1341    .text               mf_p.l(ffltui.o)
-    0x08001024   0x08001024   0x00000032   Code   RO         1343    .text               mf_p.l(ffixi.o)
-    0x08001056   0x08001056   0x00000028   Code   RO         1345    .text               mf_p.l(ffixui.o)
-    0x0800107e   0x0800107e   0x0000003e   Code   RO         1365    .text               mc_p.l(uidiv_div0.o)
-    0x080010bc   0x080010bc   0x00000000   Code   RO         1371    .text               mc_p.l(iusefp.o)
-    0x080010bc   0x080010bc   0x00000082   Code   RO         1372    .text               mf_p.l(fepilogue.o)
+    0x08000000   0x08000000   0x000000c0   Data   RO         1259    RESET               startup_mm32spin0230_keil.o
+    0x080000c0   0x080000c0   0x00000000   Code   RO         1320  * .ARM.Collect$$$$00000000  mc_p.l(entry.o)
+    0x080000c0   0x080000c0   0x00000004   Code   RO         1351    .ARM.Collect$$$$00000001  mc_p.l(entry2.o)
+    0x080000c4   0x080000c4   0x00000004   Code   RO         1354    .ARM.Collect$$$$00000004  mc_p.l(entry5.o)
+    0x080000c8   0x080000c8   0x00000000   Code   RO         1356    .ARM.Collect$$$$00000008  mc_p.l(entry7b.o)
+    0x080000c8   0x080000c8   0x00000000   Code   RO         1358    .ARM.Collect$$$$0000000A  mc_p.l(entry8b.o)
+    0x080000c8   0x080000c8   0x00000008   Code   RO         1359    .ARM.Collect$$$$0000000B  mc_p.l(entry9a.o)
+    0x080000d0   0x080000d0   0x00000000   Code   RO         1361    .ARM.Collect$$$$0000000D  mc_p.l(entry10a.o)
+    0x080000d0   0x080000d0   0x00000000   Code   RO         1363    .ARM.Collect$$$$0000000F  mc_p.l(entry11a.o)
+    0x080000d0   0x080000d0   0x00000004   Code   RO         1352    .ARM.Collect$$$$00002712  mc_p.l(entry2.o)
+    0x080000d4   0x080000d4   0x00000028   Code   RO         1260    .text               startup_mm32spin0230_keil.o
+    0x080000fc   0x080000fc   0x00000cfc   Code   RO         1312    .text               002_mc_core_V1_01.lib(mc_core.o)
+    0x08000df8   0x08000df8   0x00000024   Code   RO         1329    .text               mc_p.l(memcpya.o)
+    0x08000e1c   0x08000e1c   0x00000024   Code   RO         1331    .text               mc_p.l(memseta.o)
+    0x08000e40   0x08000e40   0x000000b2   Code   RO         1335    .text               mf_p.l(fadd.o)
+    0x08000ef2   0x08000ef2   0x0000007a   Code   RO         1337    .text               mf_p.l(fmul.o)
+    0x08000f6c   0x08000f6c   0x0000007c   Code   RO         1339    .text               mf_p.l(fdiv.o)
+    0x08000fe8   0x08000fe8   0x00000018   Code   RO         1341    .text               mf_p.l(fscalb.o)
+    0x08001000   0x08001000   0x00000016   Code   RO         1343    .text               mf_p.l(fflti.o)
+    0x08001016   0x08001016   0x0000000e   Code   RO         1345    .text               mf_p.l(ffltui.o)
+    0x08001024   0x08001024   0x00000032   Code   RO         1347    .text               mf_p.l(ffixi.o)
+    0x08001056   0x08001056   0x00000028   Code   RO         1349    .text               mf_p.l(ffixui.o)
+    0x0800107e   0x0800107e   0x0000003e   Code   RO         1369    .text               mc_p.l(uidiv_div0.o)
+    0x080010bc   0x080010bc   0x00000000   Code   RO         1375    .text               mc_p.l(iusefp.o)
+    0x080010bc   0x080010bc   0x00000082   Code   RO         1376    .text               mf_p.l(fepilogue.o)
     0x0800113e   0x0800113e   0x00000002   PAD
-    0x08001140   0x08001140   0x00000030   Code   RO         1374    .text               mc_p.l(init.o)
-    0x08001170   0x08001170   0x00000010   Code   RO          602    .text.ADC_AnyChannelCmd  hal_adc.o
-    0x08001180   0x08001180   0x0000000e   Code   RO          600    .text.ADC_AnyChannelNumCfg  hal_adc.o
-    0x0800118e   0x0800118e   0x00000026   Code   RO          598    .text.ADC_AnyChannelSelect  hal_adc.o
-    0x080011b4   0x080011b4   0x00000018   Code   RO          578    .text.ADC_ChannelCmd  hal_adc.o
-    0x080011cc   0x080011cc   0x00000044   Code   RO          608    .text.ADC_ClearFlag  hal_adc.o
-    0x08001210   0x08001210   0x00000054   Code   RO          612    .text.ADC_ClearITPendingBit  hal_adc.o
-    0x08001264   0x08001264   0x00000010   Code   RO          568    .text.ADC_Cmd       hal_adc.o
-    0x08001274   0x08001274   0x00000020   Code   RO          562    .text.ADC_DeInit    hal_adc.o
-    0x08001294   0x08001294   0x00000012   Code   RO          580    .text.ADC_ExternalTrigConvCmd  hal_adc.o
+    0x08001140   0x08001140   0x00000030   Code   RO         1378    .text               mc_p.l(init.o)
+    0x08001170   0x08001170   0x00000010   Code   RO          606    .text.ADC_AnyChannelCmd  hal_adc.o
+    0x08001180   0x08001180   0x0000000e   Code   RO          604    .text.ADC_AnyChannelNumCfg  hal_adc.o
+    0x0800118e   0x0800118e   0x00000026   Code   RO          602    .text.ADC_AnyChannelSelect  hal_adc.o
+    0x080011b4   0x080011b4   0x00000018   Code   RO          582    .text.ADC_ChannelCmd  hal_adc.o
+    0x080011cc   0x080011cc   0x00000044   Code   RO          612    .text.ADC_ClearFlag  hal_adc.o
+    0x08001210   0x08001210   0x00000054   Code   RO          616    .text.ADC_ClearITPendingBit  hal_adc.o
+    0x08001264   0x08001264   0x00000010   Code   RO          572    .text.ADC_Cmd       hal_adc.o
+    0x08001274   0x08001274   0x00000020   Code   RO          566    .text.ADC_DeInit    hal_adc.o
+    0x08001294   0x08001294   0x00000012   Code   RO          584    .text.ADC_ExternalTrigConvCmd  hal_adc.o
     0x080012a6   0x080012a6   0x00000002   PAD
-    0x080012a8   0x080012a8   0x00000038   Code   RO          582    .text.ADC_ExternalTrigSourceConfig  hal_adc.o
-    0x080012e0   0x080012e0   0x00000006   Code   RO          584    .text.ADC_GetConversionValue  hal_adc.o
+    0x080012a8   0x080012a8   0x00000038   Code   RO          586    .text.ADC_ExternalTrigSourceConfig  hal_adc.o
+    0x080012e0   0x080012e0   0x00000006   Code   RO          588    .text.ADC_GetConversionValue  hal_adc.o
     0x080012e6   0x080012e6   0x00000002   PAD
-    0x080012e8   0x080012e8   0x00000090   Code   RO          606    .text.ADC_GetFlagStatus  hal_adc.o
-    0x08001378   0x08001378   0x0000008e   Code   RO          610    .text.ADC_GetITStatus  hal_adc.o
+    0x080012e8   0x080012e8   0x00000090   Code   RO          610    .text.ADC_GetFlagStatus  hal_adc.o
+    0x08001378   0x08001378   0x0000008e   Code   RO          614    .text.ADC_GetITStatus  hal_adc.o
     0x08001406   0x08001406   0x00000002   PAD
     0x08001408   0x08001408   0x000000f4   Code   RO          102    .text.ADC_IRQHandler  mm32_it.o
-    0x080014fc   0x080014fc   0x000000b6   Code   RO          604    .text.ADC_ITConfig  hal_adc.o
+    0x080014fc   0x080014fc   0x000000b6   Code   RO          608    .text.ADC_ITConfig  hal_adc.o
     0x080015b2   0x080015b2   0x00000002   PAD
-    0x080015b4   0x080015b4   0x0000004c   Code   RO          564    .text.ADC_Init      hal_adc.o
-    0x08001600   0x08001600   0x00000026   Code   RO          576    .text.ADC_SampleTimeConfig  hal_adc.o
-    0x08001626   0x08001626   0x00000014   Code   RO          572    .text.ADC_SoftwareStartConvCmd  hal_adc.o
-    0x0800163a   0x0800163a   0x0000000c   Code   RO          566    .text.ADC_StructInit  hal_adc.o
+    0x080015b4   0x080015b4   0x0000004c   Code   RO          568    .text.ADC_Init      hal_adc.o
+    0x08001600   0x08001600   0x00000026   Code   RO          580    .text.ADC_SampleTimeConfig  hal_adc.o
+    0x08001626   0x08001626   0x00000014   Code   RO          576    .text.ADC_SoftwareStartConvCmd  hal_adc.o
+    0x0800163a   0x0800163a   0x0000000c   Code   RO          570    .text.ADC_StructInit  hal_adc.o
     0x08001646   0x08001646   0x00000002   PAD
-    0x08001648   0x08001648   0x00000018   Code   RO          594    .text.ADC_TempSensorCmd  hal_adc.o
-    0x08001660   0x08001660   0x00000004   Code   RO          353    .text.Bat_Com_CanRun  bat_com.o
-    0x08001664   0x08001664   0x00000002   Code   RO          361    .text.Bat_Com_Restart  bat_com.o
-    0x08001666   0x08001666   0x00000002   Code   RO          363    .text.Bat_Com_Sleep  bat_com.o
+    0x08001648   0x08001648   0x00000018   Code   RO          598    .text.ADC_TempSensorCmd  hal_adc.o
+    0x08001660   0x08001660   0x00000004   Code   RO          357    .text.Bat_Com_CanRun  bat_com.o
+    0x08001664   0x08001664   0x00000002   Code   RO          365    .text.Bat_Com_Restart  bat_com.o
+    0x08001666   0x08001666   0x00000002   Code   RO          367    .text.Bat_Com_Sleep  bat_com.o
     0x08001668   0x08001668   0x00000098   Code   RO           41    .text.Board_ADC_Init  board.o
     0x08001700   0x08001700   0x000000c4   Code   RO           55    .text.Board_SNS_Comp_Init  board.o
-    0x080017c4   0x080017c4   0x00000048   Code   RO          548    .text.Brake_Motor   drv_pwm.o
+    0x080017c4   0x080017c4   0x00000048   Code   RO          552    .text.Brake_Motor   drv_pwm.o
     0x0800180c   0x0800180c   0x00000094   Code   RO           19    .text.Bsp_Adc_Init  board.o
     0x080018a0   0x080018a0   0x00000002   Code   RO           31    .text.Bsp_Com_init  board.o
     0x080018a2   0x080018a2   0x00000002   PAD
@@ -3155,258 +3178,262 @@ Memory Map of the image
     0x0800194c   0x0800194c   0x000000b4   Code   RO           37    .text.Bsp_Pwm_Init  board.o
     0x08001a00   0x08001a00   0x0000003c   Code   RO           35    .text.Bsp_dir_init  board.o
     0x08001a3c   0x08001a3c   0x0000002e   Code   RO          118    .text.COMP1_2_IRQHandler  mm32_it.o
-    0x08001a6a   0x08001a6a   0x00000010   Code   RO          652    .text.COMP_Cmd      hal_comp.o
+    0x08001a6a   0x08001a6a   0x00000010   Code   RO          656    .text.COMP_Cmd      hal_comp.o
     0x08001a7a   0x08001a7a   0x00000002   PAD
-    0x08001a7c   0x08001a7c   0x00000018   Code   RO          656    .text.COMP_CrvCmd   hal_comp.o
-    0x08001a94   0x08001a94   0x00000006   Code   RO          646    .text.COMP_DeInit   hal_comp.o
-    0x08001a9a   0x08001a9a   0x00000026   Code   RO          648    .text.COMP_Init     hal_comp.o
-    0x08001ac0   0x08001ac0   0x00000024   Code   RO          654    .text.COMP_SetCrv   hal_comp.o
-    0x08001ae4   0x08001ae4   0x00000020   Code   RO          650    .text.COMP_StructInit  hal_comp.o
-    0x08001b04   0x08001b04   0x0000000c   Code   RO          410    .text.Clear_Over_Flag  systick.o
-    0x08001b10   0x08001b10   0x00000214   Code   RO         1269    .text.CurrentOffsetCalibration  motor_control.o
+    0x08001a7c   0x08001a7c   0x00000018   Code   RO          660    .text.COMP_CrvCmd   hal_comp.o
+    0x08001a94   0x08001a94   0x00000006   Code   RO          650    .text.COMP_DeInit   hal_comp.o
+    0x08001a9a   0x08001a9a   0x00000026   Code   RO          652    .text.COMP_Init     hal_comp.o
+    0x08001ac0   0x08001ac0   0x00000024   Code   RO          658    .text.COMP_SetCrv   hal_comp.o
+    0x08001ae4   0x08001ae4   0x00000020   Code   RO          654    .text.COMP_StructInit  hal_comp.o
+    0x08001b04   0x08001b04   0x0000000c   Code   RO          414    .text.Clear_Over_Flag  systick.o
+    0x08001b10   0x08001b10   0x00000214   Code   RO         1273    .text.CurrentOffsetCalibration  motor_control.o
     0x08001d24   0x08001d24   0x00000002   Code   RO           96    .text.DMA1_Channel1_IRQHandler  mm32_it.o
-    0x08001d26   0x08001d26   0x00000050   Code   RO          432    .text.Drv_Adc_Basic_Init  drv_adc.o
-    0x08001d76   0x08001d76   0x00000050   Code   RO          434    .text.Drv_Adc_Channel_Init  drv_adc.o
-    0x08001dc6   0x08001dc6   0x0000006a   Code   RO          446    .text.Drv_Comp_Init  drv_comp.o
-    0x08001e30   0x08001e30   0x000000e4   Code   RO          492    .text.Drv_Pwm_Init  drv_pwm.o
+    0x08001d26   0x08001d26   0x00000050   Code   RO          436    .text.Drv_Adc_Basic_Init  drv_adc.o
+    0x08001d76   0x08001d76   0x00000050   Code   RO          438    .text.Drv_Adc_Channel_Init  drv_adc.o
+    0x08001dc6   0x08001dc6   0x0000006a   Code   RO          450    .text.Drv_Comp_Init  drv_comp.o
+    0x08001e30   0x08001e30   0x000000e4   Code   RO          496    .text.Drv_Pwm_Init  drv_pwm.o
     0x08001f14   0x08001f14   0x00000002   Code   RO           88    .text.EXTI0_1_IRQHandler  mm32_it.o
     0x08001f16   0x08001f16   0x00000002   Code   RO           90    .text.EXTI2_3_IRQHandler  mm32_it.o
     0x08001f18   0x08001f18   0x00000002   Code   RO           92    .text.EXTI4_15_IRQHandler  mm32_it.o
     0x08001f1a   0x08001f1a   0x00000002   PAD
-    0x08001f1c   0x08001f1c   0x0000000c   Code   RO          728    .text.EXTI_ClearITPendingBit  hal_exti.o
-    0x08001f28   0x08001f28   0x00000018   Code   RO          726    .text.EXTI_GetITStatus  hal_exti.o
-    0x08001f40   0x08001f40   0x00000078   Code   RO          716    .text.EXTI_Init     hal_exti.o
-    0x08001fb8   0x08001fb8   0x0000000e   Code   RO          718    .text.EXTI_StructInit  hal_exti.o
+    0x08001f1c   0x08001f1c   0x0000000c   Code   RO          732    .text.EXTI_ClearITPendingBit  hal_exti.o
+    0x08001f28   0x08001f28   0x00000018   Code   RO          730    .text.EXTI_GetITStatus  hal_exti.o
+    0x08001f40   0x08001f40   0x00000078   Code   RO          720    .text.EXTI_Init     hal_exti.o
+    0x08001fb8   0x08001fb8   0x0000000e   Code   RO          722    .text.EXTI_StructInit  hal_exti.o
     0x08001fc6   0x08001fc6   0x00000002   PAD
     0x08001fc8   0x08001fc8   0x00000048   Code   RO           27    .text.En_Port_init  board.o
-    0x08002010   0x08002010   0x00000008   Code   RO          776    .text.FLASH_ClearFlag  hal_flash.o
-    0x08002018   0x08002018   0x0000005c   Code   RO          748    .text.FLASH_ErasePage  hal_flash.o
+    0x08002010   0x08002010   0x00000008   Code   RO          780    .text.FLASH_ClearFlag  hal_flash.o
+    0x08002018   0x08002018   0x0000005c   Code   RO          752    .text.FLASH_ErasePage  hal_flash.o
     0x08002074   0x08002074   0x00000002   Code   RO           84    .text.FLASH_IRQHandler  mm32_it.o
     0x08002076   0x08002076   0x00000002   PAD
-    0x08002078   0x08002078   0x00000010   Code   RO          742    .text.FLASH_Lock    hal_flash.o
-    0x08002088   0x08002088   0x00000054   Code   RO          756    .text.FLASH_ProgramHalfWord  hal_flash.o
-    0x080020dc   0x080020dc   0x00000018   Code   RO          744    .text.FLASH_Unlock  hal_flash.o
-    0x080020f4   0x080020f4   0x00000090   Code   RO          792    .text.GPIO_Init     hal_gpio.o
-    0x08002184   0x08002184   0x00000020   Code   RO          814    .text.GPIO_PinAFConfig  hal_gpio.o
-    0x080021a4   0x080021a4   0x0000000a   Code   RO          796    .text.GPIO_ReadInputDataBit  hal_gpio.o
-    0x080021ae   0x080021ae   0x00000004   Code   RO          806    .text.GPIO_ResetBits  hal_gpio.o
-    0x080021b2   0x080021b2   0x00000004   Code   RO          804    .text.GPIO_SetBits  hal_gpio.o
+    0x08002078   0x08002078   0x00000010   Code   RO          746    .text.FLASH_Lock    hal_flash.o
+    0x08002088   0x08002088   0x00000054   Code   RO          760    .text.FLASH_ProgramHalfWord  hal_flash.o
+    0x080020dc   0x080020dc   0x00000018   Code   RO          748    .text.FLASH_Unlock  hal_flash.o
+    0x080020f4   0x080020f4   0x00000090   Code   RO          796    .text.GPIO_Init     hal_gpio.o
+    0x08002184   0x08002184   0x00000020   Code   RO          818    .text.GPIO_PinAFConfig  hal_gpio.o
+    0x080021a4   0x080021a4   0x0000000a   Code   RO          800    .text.GPIO_ReadInputDataBit  hal_gpio.o
+    0x080021ae   0x080021ae   0x00000004   Code   RO          810    .text.GPIO_ResetBits  hal_gpio.o
+    0x080021b2   0x080021b2   0x00000004   Code   RO          808    .text.GPIO_SetBits  hal_gpio.o
     0x080021b6   0x080021b6   0x00000002   PAD
-    0x080021b8   0x080021b8   0x00000014   Code   RO          794    .text.GPIO_StructInit  hal_gpio.o
-    0x080021cc   0x080021cc   0x00000010   Code   RO          808    .text.GPIO_WriteBit  hal_gpio.o
+    0x080021b8   0x080021b8   0x00000014   Code   RO          798    .text.GPIO_StructInit  hal_gpio.o
+    0x080021cc   0x080021cc   0x00000010   Code   RO          812    .text.GPIO_WriteBit  hal_gpio.o
     0x080021dc   0x080021dc   0x00000002   Code   RO           94    .text.HWDIV_IRQHandler  mm32_it.o
     0x080021de   0x080021de   0x00000002   PAD
     0x080021e0   0x080021e0   0x000000b8   Code   RO           72    .text.Interrupt_Init  mm32_it.o
-    0x08002298   0x08002298   0x000000e8   Code   RO          216    .text.LED_Scan      led.o
-    0x08002380   0x08002380   0x000000c0   Code   RO          220    .text.LedError_Control  led.o
-    0x08002440   0x08002440   0x000001b8   Code   RO          222    .text.LedError_Run  led.o
-    0x080025f8   0x080025f8   0x000001a0   Code   RO          224    .text.LedSoc_Run    led.o
-    0x08002798   0x08002798   0x000004f4   Code   RO         1283    .text.MC_Machine_State  motor_control.o
-    0x08002c8c   0x08002c8c   0x00000050   Code   RO          874    .text.NVIC_Init     hal_misc.o
-    0x08002cdc   0x08002cdc   0x00000010   Code   RO          888    .text.OPAMP_Cmd     hal_opamp.o
+    0x08002298   0x08002298   0x000000e8   Code   RO          220    .text.LED_Scan      led.o
+    0x08002380   0x08002380   0x000000c0   Code   RO          224    .text.LedError_Control  led.o
+    0x08002440   0x08002440   0x000001b8   Code   RO          226    .text.LedError_Run  led.o
+    0x080025f8   0x080025f8   0x000001a0   Code   RO          228    .text.LedSoc_Run    led.o
+    0x08002798   0x08002798   0x000004f4   Code   RO         1287    .text.MC_Machine_State  motor_control.o
+    0x08002c8c   0x08002c8c   0x00000050   Code   RO          878    .text.NVIC_Init     hal_misc.o
+    0x08002cdc   0x08002cdc   0x00000010   Code   RO          892    .text.OPAMP_Cmd     hal_opamp.o
     0x08002cec   0x08002cec   0x00000002   Code   RO           80    .text.PVD_IRQHandler  mm32_it.o
     0x08002cee   0x08002cee   0x00000002   PAD
     0x08002cf0   0x08002cf0   0x0000018c   Code   RO           59    .text.Peripheral_Init  board.o
-    0x08002e7c   0x08002e7c   0x0000001c   Code   RO          552    .text.PwmDutyUpdate  drv_pwm.o
-    0x08002e98   0x08002e98   0x0000001c   Code   RO          944    .text.RCC_AHBPeriphClockCmd  hal_rcc.o
-    0x08002eb4   0x08002eb4   0x0000001c   Code   RO          946    .text.RCC_APB1PeriphClockCmd  hal_rcc.o
-    0x08002ed0   0x08002ed0   0x0000001c   Code   RO          950    .text.RCC_APB1PeriphResetCmd  hal_rcc.o
+    0x08002e7c   0x08002e7c   0x0000001c   Code   RO          556    .text.PwmDutyUpdate  drv_pwm.o
+    0x08002e98   0x08002e98   0x0000001c   Code   RO          948    .text.RCC_AHBPeriphClockCmd  hal_rcc.o
+    0x08002eb4   0x08002eb4   0x0000001c   Code   RO          950    .text.RCC_APB1PeriphClockCmd  hal_rcc.o
+    0x08002ed0   0x08002ed0   0x0000001c   Code   RO          954    .text.RCC_APB1PeriphResetCmd  hal_rcc.o
     0x08002eec   0x08002eec   0x00000002   Code   RO           86    .text.RCC_IRQHandler  mm32_it.o
     0x08002eee   0x08002eee   0x00000002   PAD
-    0x08002ef0   0x08002ef0   0x00000020   Code   RO          546    .text.Stop_Motor    drv_pwm.o
-    0x08002f10   0x08002f10   0x00000018   Code   RO          876    .text.SysTick_CLKSourceConfig  hal_misc.o
+    0x08002ef0   0x08002ef0   0x00000020   Code   RO          550    .text.Stop_Motor    drv_pwm.o
+    0x08002f10   0x08002f10   0x00000018   Code   RO          880    .text.SysTick_CLKSourceConfig  hal_misc.o
     0x08002f28   0x08002f28   0x00000008   Code   RO           76    .text.SysTick_Handler  mm32_it.o
-    0x08002f30   0x08002f30   0x000000f0   Code   RO         1243    .text.SystemInit    system_mm32spin0230.o
-    0x08003020   0x08003020   0x00000040   Code   RO          402    .text.Systick_Init  systick.o
+    0x08002f30   0x08002f30   0x000000f0   Code   RO         1247    .text.SystemInit    system_mm32spin0230.o
+    0x08003020   0x08003020   0x00000040   Code   RO          406    .text.Systick_Init  systick.o
     0x08003060   0x08003060   0x00000020   Code   RO          112    .text.TIM13_IRQHandler  mm32_it.o
     0x08003080   0x08003080   0x00000024   Code   RO          114    .text.TIM14_IRQHandler  mm32_it.o
     0x080030a4   0x080030a4   0x0000007c   Code   RO          104    .text.TIM1_BRK_UP_TRG_COM_IRQHandler  mm32_it.o
     0x08003120   0x08003120   0x00000002   Code   RO          106    .text.TIM1_CC_IRQHandler  mm32_it.o
     0x08003122   0x08003122   0x00000002   Code   RO          108    .text.TIM2_IRQHandler  mm32_it.o
     0x08003124   0x08003124   0x00000020   Code   RO          110    .text.TIM6_IRQHandler  mm32_it.o
-    0x08003144   0x08003144   0x00000012   Code   RO         1054    .text.TIM_ARRPreloadConfig  hal_tim.o
-    0x08003156   0x08003156   0x0000001e   Code   RO         1012    .text.TIM_BDTRConfig  hal_tim.o
-    0x08003174   0x08003174   0x00000010   Code   RO         1178    .text.TIM_BreakInputFilterCmd  hal_tim.o
-    0x08003184   0x08003184   0x00000032   Code   RO         1176    .text.TIM_BreakInputFilterConfig  hal_tim.o
-    0x080031b6   0x080031b6   0x00000008   Code   RO         1156    .text.TIM_ClearFlag  hal_tim.o
-    0x080031be   0x080031be   0x00000010   Code   RO         1014    .text.TIM_Cmd       hal_tim.o
-    0x080031ce   0x080031ce   0x00000014   Code   RO         1016    .text.TIM_CtrlPWMOutputs  hal_tim.o
-    0x080031e2   0x080031e2   0x0000000a   Code   RO         1154    .text.TIM_GetFlagStatus  hal_tim.o
-    0x080031ec   0x080031ec   0x00000014   Code   RO         1018    .text.TIM_ITConfig  hal_tim.o
-    0x08003200   0x08003200   0x00000080   Code   RO          988    .text.TIM_OC1Init   hal_tim.o
-    0x08003280   0x08003280   0x0000000e   Code   RO         1062    .text.TIM_OC1PreloadConfig  hal_tim.o
+    0x08003144   0x08003144   0x00000012   Code   RO         1058    .text.TIM_ARRPreloadConfig  hal_tim.o
+    0x08003156   0x08003156   0x0000001e   Code   RO         1016    .text.TIM_BDTRConfig  hal_tim.o
+    0x08003174   0x08003174   0x00000010   Code   RO         1182    .text.TIM_BreakInputFilterCmd  hal_tim.o
+    0x08003184   0x08003184   0x00000032   Code   RO         1180    .text.TIM_BreakInputFilterConfig  hal_tim.o
+    0x080031b6   0x080031b6   0x00000008   Code   RO         1160    .text.TIM_ClearFlag  hal_tim.o
+    0x080031be   0x080031be   0x00000010   Code   RO         1018    .text.TIM_Cmd       hal_tim.o
+    0x080031ce   0x080031ce   0x00000014   Code   RO         1020    .text.TIM_CtrlPWMOutputs  hal_tim.o
+    0x080031e2   0x080031e2   0x0000000a   Code   RO         1158    .text.TIM_GetFlagStatus  hal_tim.o
+    0x080031ec   0x080031ec   0x00000014   Code   RO         1022    .text.TIM_ITConfig  hal_tim.o
+    0x08003200   0x08003200   0x00000080   Code   RO          992    .text.TIM_OC1Init   hal_tim.o
+    0x08003280   0x08003280   0x0000000e   Code   RO         1066    .text.TIM_OC1PreloadConfig  hal_tim.o
     0x0800328e   0x0800328e   0x00000002   PAD
-    0x08003290   0x08003290   0x00000084   Code   RO          990    .text.TIM_OC2Init   hal_tim.o
-    0x08003314   0x08003314   0x00000012   Code   RO         1064    .text.TIM_OC2PreloadConfig  hal_tim.o
+    0x08003290   0x08003290   0x00000084   Code   RO          994    .text.TIM_OC2Init   hal_tim.o
+    0x08003314   0x08003314   0x00000012   Code   RO         1068    .text.TIM_OC2PreloadConfig  hal_tim.o
     0x08003326   0x08003326   0x00000002   PAD
-    0x08003328   0x08003328   0x00000080   Code   RO          992    .text.TIM_OC3Init   hal_tim.o
-    0x080033a8   0x080033a8   0x0000000e   Code   RO         1066    .text.TIM_OC3PreloadConfig  hal_tim.o
+    0x08003328   0x08003328   0x00000080   Code   RO          996    .text.TIM_OC3Init   hal_tim.o
+    0x080033a8   0x080033a8   0x0000000e   Code   RO         1070    .text.TIM_OC3PreloadConfig  hal_tim.o
     0x080033b6   0x080033b6   0x00000002   PAD
-    0x080033b8   0x080033b8   0x0000008c   Code   RO          994    .text.TIM_OC4Init   hal_tim.o
-    0x08003444   0x08003444   0x0000000e   Code   RO         1118    .text.TIM_SelectOutputTrigger  hal_tim.o
+    0x080033b8   0x080033b8   0x0000008c   Code   RO          998    .text.TIM_OC4Init   hal_tim.o
+    0x08003444   0x08003444   0x0000000e   Code   RO         1122    .text.TIM_SelectOutputTrigger  hal_tim.o
     0x08003452   0x08003452   0x00000002   PAD
-    0x08003454   0x08003454   0x0000005c   Code   RO          984    .text.TIM_TimeBaseInit  hal_tim.o
-    0x080034b0   0x080034b0   0x00000028   Code   RO          328    .text.TM1650_Clear  tm1650.o
-    0x080034d8   0x080034d8   0x00000080   Code   RO          332    .text.TM1650_FlushStep  tm1650.o
-    0x08003558   0x08003558   0x000000cc   Code   RO          312    .text.TM1650_Init   tm1650.o
-    0x08003624   0x08003624   0x000000f8   Code   RO          318    .text.TM1650_ReadKey  tm1650.o
-    0x0800371c   0x0800371c   0x00000024   Code   RO          324    .text.TM1650_SetDigit  tm1650.o
-    0x08003740   0x08003740   0x00000028   Code   RO          316    .text.TM1650_SetDisplay  tm1650.o
-    0x08003768   0x08003768   0x00000068   Code   RO          314    .text.TM1650_Transfer  tm1650.o
-    0x080037d0   0x080037d0   0x00000098   Code   RO          320    .text.TM1650_WriteByte  tm1650.o
-    0x08003868   0x08003868   0x00000034   Code   RO          524    .text.UH_HOnLOff    drv_pwm.o
-    0x0800389c   0x0800389c   0x00000034   Code   RO          506    .text.UH_VL_HOnLOn  drv_pwm.o
-    0x080038d0   0x080038d0   0x00000034   Code   RO          494    .text.UH_VL_HPwmLOn  drv_pwm.o
-    0x08003904   0x08003904   0x00000030   Code   RO          508    .text.UH_WL_HOnLOn  drv_pwm.o
-    0x08003934   0x08003934   0x00000034   Code   RO          496    .text.UH_WL_HPwmLOn  drv_pwm.o
-    0x08003968   0x08003968   0x00000034   Code   RO          518    .text.UL_HOffLOn    drv_pwm.o
-    0x0800399c   0x0800399c   0x0000013c   Code   RO          218    .text.UO_Led_Handler  led.o
-    0x08003ad8   0x08003ad8   0x00000034   Code   RO          542    .text.UVWL_HOffLPwm  drv_pwm.o
+    0x08003454   0x08003454   0x0000005c   Code   RO          988    .text.TIM_TimeBaseInit  hal_tim.o
+    0x080034b0   0x080034b0   0x00000028   Code   RO          332    .text.TM1650_Clear  tm1650.o
+    0x080034d8   0x080034d8   0x00000080   Code   RO          336    .text.TM1650_FlushStep  tm1650.o
+    0x08003558   0x08003558   0x000000cc   Code   RO          316    .text.TM1650_Init   tm1650.o
+    0x08003624   0x08003624   0x000000f8   Code   RO          322    .text.TM1650_ReadKey  tm1650.o
+    0x0800371c   0x0800371c   0x00000024   Code   RO          328    .text.TM1650_SetDigit  tm1650.o
+    0x08003740   0x08003740   0x00000028   Code   RO          320    .text.TM1650_SetDisplay  tm1650.o
+    0x08003768   0x08003768   0x00000068   Code   RO          318    .text.TM1650_Transfer  tm1650.o
+    0x080037d0   0x080037d0   0x00000098   Code   RO          324    .text.TM1650_WriteByte  tm1650.o
+    0x08003868   0x08003868   0x00000034   Code   RO          528    .text.UH_HOnLOff    drv_pwm.o
+    0x0800389c   0x0800389c   0x00000034   Code   RO          510    .text.UH_VL_HOnLOn  drv_pwm.o
+    0x080038d0   0x080038d0   0x00000034   Code   RO          498    .text.UH_VL_HPwmLOn  drv_pwm.o
+    0x08003904   0x08003904   0x00000030   Code   RO          512    .text.UH_WL_HOnLOn  drv_pwm.o
+    0x08003934   0x08003934   0x00000034   Code   RO          500    .text.UH_WL_HPwmLOn  drv_pwm.o
+    0x08003968   0x08003968   0x00000034   Code   RO          522    .text.UL_HOffLOn    drv_pwm.o
+    0x0800399c   0x0800399c   0x0000013c   Code   RO          222    .text.UO_Led_Handler  led.o
+    0x08003ad8   0x08003ad8   0x00000034   Code   RO          546    .text.UVWL_HOffLPwm  drv_pwm.o
     0x08003b0c   0x08003b0c   0x0000007c   Code   RO          158    .text.User_Temperature_Handler  user_control.o
     0x08003b88   0x08003b88   0x00000030   Code   RO          156    .text.User_Temperature_Handler_Fast  user_control.o
-    0x08003bb8   0x08003bb8   0x00000034   Code   RO          526    .text.VH_HOnLOff    drv_pwm.o
-    0x08003bec   0x08003bec   0x00000038   Code   RO          512    .text.VH_UL_HOnLOn  drv_pwm.o
-    0x08003c24   0x08003c24   0x00000038   Code   RO          500    .text.VH_UL_HPwmLOn  drv_pwm.o
-    0x08003c5c   0x08003c5c   0x00000034   Code   RO          510    .text.VH_WL_HOnLOn  drv_pwm.o
-    0x08003c90   0x08003c90   0x00000038   Code   RO          498    .text.VH_WL_HPwmLOn  drv_pwm.o
-    0x08003cc8   0x08003cc8   0x00000038   Code   RO          520    .text.VL_HOffLOn    drv_pwm.o
+    0x08003bb8   0x08003bb8   0x00000034   Code   RO          530    .text.VH_HOnLOff    drv_pwm.o
+    0x08003bec   0x08003bec   0x00000038   Code   RO          516    .text.VH_UL_HOnLOn  drv_pwm.o
+    0x08003c24   0x08003c24   0x00000038   Code   RO          504    .text.VH_UL_HPwmLOn  drv_pwm.o
+    0x08003c5c   0x08003c5c   0x00000034   Code   RO          514    .text.VH_WL_HOnLOn  drv_pwm.o
+    0x08003c90   0x08003c90   0x00000038   Code   RO          502    .text.VH_WL_HPwmLOn  drv_pwm.o
+    0x08003cc8   0x08003cc8   0x00000038   Code   RO          524    .text.VL_HOffLOn    drv_pwm.o
     0x08003d00   0x08003d00   0x00000178   Code   RO          146    .text.Vcc_5V_CAL    user_control.o
     0x08003e78   0x08003e78   0x00000124   Code   RO          154    .text.Volt_Handler  user_control.o
     0x08003f9c   0x08003f9c   0x00000078   Code   RO          152    .text.Volt_Handler_fast  user_control.o
-    0x08004014   0x08004014   0x00000038   Code   RO          528    .text.WH_HOnLOff    drv_pwm.o
-    0x0800404c   0x0800404c   0x00000034   Code   RO          514    .text.WH_UL_HOnLOn  drv_pwm.o
-    0x08004080   0x08004080   0x00000038   Code   RO          502    .text.WH_UL_HPwmLOn  drv_pwm.o
-    0x080040b8   0x080040b8   0x00000030   Code   RO          516    .text.WH_VL_HOnLOn  drv_pwm.o
-    0x080040e8   0x080040e8   0x00000034   Code   RO          504    .text.WH_VL_HPwmLOn  drv_pwm.o
-    0x0800411c   0x0800411c   0x00000038   Code   RO          522    .text.WL_HOffLOn    drv_pwm.o
-    0x08004154   0x08004154   0x00000024   Code   RO          174    .text.error_hold_updata  user_control.o
-    0x08004178   0x08004178   0x000000d0   Code   RO          251    .text.flash_find_latest  flash_data_save.o
-    0x08004248   0x08004248   0x000000e4   Code   RO          253    .text.flash_read_record  flash_data_save.o
-    0x0800432c   0x0800432c   0x0000008c   Code   RO          214    .text.led_init      led.o
-    0x080043b8   0x080043b8   0x00000030   Code   RO          226    .text.led_tm1650_handle  led.o
-    0x080043e8   0x080043e8   0x000001b0   Code   RO            6    .text.main          main.o
-    0x08004598   0x08004598   0x000000d0   Code   RO         1263    .text.mc_init       motor_control.o
-    0x08004668   0x08004668   0x000000dc   Code   RO         1271    .text.mos_check_current  motor_control.o
-    0x08004744   0x08004744   0x00000118   Code   RO         1273    .text.mose_check    motor_control.o
-    0x0800485c   0x0800485c   0x00000118   Code   RO         1265    .text.motor_block_detect  motor_control.o
-    0x08004974   0x08004974   0x00000064   Code   RO          172    .text.motor_on_off_control  user_control.o
-    0x080049d8   0x080049d8   0x00000058   Code   RO          164    .text.pwm_duty_aim_deal  user_control.o
-    0x08004a30   0x08004a30   0x000000f8   Code   RO         1267    .text.pwm_set       motor_control.o
-    0x08004b28   0x08004b28   0x00000050   Code   RO          257    .text.read_user_data  flash_data_save.o
-    0x08004b78   0x08004b78   0x00000218   Code   RO          249    .text.save_user_data_checked  flash_data_save.o
-    0x08004d90   0x08004d90   0x00000060   Code   RO          444    .text.select_comp_ch_for_sector  drv_comp.o
-    0x08004df0   0x08004df0   0x00000024   Code   RO          420    .text.systick_delay_us  systick.o
-    0x08004e14   0x08004e14   0x00000010   Code   RO          269    .text.tool_mode_current  tool_mode.o
-    0x08004e24   0x08004e24   0x00000274   Code   RO          285    .text.tool_mode_duty  tool_mode.o
-    0x08005098   0x08005098   0x00000024   Code   RO          273    .text.tool_mode_gear  tool_mode.o
-    0x080050bc   0x080050bc   0x00000054   Code   RO          267    .text.tool_mode_init  tool_mode.o
-    0x08005110   0x08005110   0x000000ac   Code   RO          279    .text.tool_mode_key_event  tool_mode.o
-    0x080051bc   0x080051bc   0x000000dc   Code   RO          281    .text.tool_mode_key_handle  tool_mode.o
-    0x08005298   0x08005298   0x00000070   Code   RO          283    .text.tool_mode_pwm_update  tool_mode.o
-    0x08005308   0x08005308   0x0000004c   Code   RO          271    .text.tool_mode_restore_direction  tool_mode.o
-    0x08005354   0x08005354   0x00000040   Code   RO          287    .text.tool_mode_save_handle  tool_mode.o
-    0x08005394   0x08005394   0x00000094   Code   RO          275    .text.tool_mode_set_direction  tool_mode.o
-    0x08005428   0x08005428   0x00000010   Code   RO          277    .text.tool_mode_tick_1ms  tool_mode.o
-    0x08005438   0x08005438   0x00000110   Code   RO          160    .text.user_direction_handle  user_control.o
-    0x08005548   0x08005548   0x00000014   Code   RO          168    .text.user_gears_handle  user_control.o
-    0x0800555c   0x0800555c   0x00000228   Code   RO          150    .text.user_oc_handle  user_control.o
-    0x08005784   0x08005784   0x00000034   Code   RO          148    .text.user_para_init  user_control.o
-    0x080057b8   0x080057b8   0x00000200   Code   RO          176    .text.user_state_control  user_control.o
-    0x080059b8   0x080059b8   0x0000001a   Code   RO         1314    i.__ARM_common_switch8  002_mc_core_V1_01.lib(mc_core.o)
-    0x080059d2   0x080059d2   0x0000000e   Code   RO         1378    i.__scatterload_copy  mc_p.l(handlers.o)
-    0x080059e0   0x080059e0   0x00000002   Code   RO         1379    i.__scatterload_null  mc_p.l(handlers.o)
-    0x080059e2   0x080059e2   0x0000000e   Code   RO         1380    i.__scatterload_zeroinit  mc_p.l(handlers.o)
-    0x080059f0   0x080059f0   0x00000020   Data   RO         1377    Region$$Table       anon$$obj.o
+    0x08004014   0x08004014   0x00000038   Code   RO          532    .text.WH_HOnLOff    drv_pwm.o
+    0x0800404c   0x0800404c   0x00000034   Code   RO          518    .text.WH_UL_HOnLOn  drv_pwm.o
+    0x08004080   0x08004080   0x00000038   Code   RO          506    .text.WH_UL_HPwmLOn  drv_pwm.o
+    0x080040b8   0x080040b8   0x00000030   Code   RO          520    .text.WH_VL_HOnLOn  drv_pwm.o
+    0x080040e8   0x080040e8   0x00000034   Code   RO          508    .text.WH_VL_HPwmLOn  drv_pwm.o
+    0x0800411c   0x0800411c   0x00000038   Code   RO          526    .text.WL_HOffLOn    drv_pwm.o
+    0x08004154   0x08004154   0x00000024   Code   RO          176    .text.error_hold_updata  user_control.o
+    0x08004178   0x08004178   0x000000d0   Code   RO          255    .text.flash_find_latest  flash_data_save.o
+    0x08004248   0x08004248   0x000000e4   Code   RO          257    .text.flash_read_record  flash_data_save.o
+    0x0800432c   0x0800432c   0x0000008c   Code   RO          218    .text.led_init      led.o
+    0x080043b8   0x080043b8   0x00000030   Code   RO          230    .text.led_tm1650_handle  led.o
+    0x080043e8   0x080043e8   0x000001b4   Code   RO            6    .text.main          main.o
+    0x0800459c   0x0800459c   0x000000d0   Code   RO         1267    .text.mc_init       motor_control.o
+    0x0800466c   0x0800466c   0x000000dc   Code   RO         1275    .text.mos_check_current  motor_control.o
+    0x08004748   0x08004748   0x00000118   Code   RO         1277    .text.mose_check    motor_control.o
+    0x08004860   0x08004860   0x00000118   Code   RO         1269    .text.motor_block_detect  motor_control.o
+    0x08004978   0x08004978   0x00000064   Code   RO          174    .text.motor_on_off_control  user_control.o
+    0x080049dc   0x080049dc   0x00000058   Code   RO          164    .text.pwm_duty_aim_deal  user_control.o
+    0x08004a34   0x08004a34   0x000000f8   Code   RO         1271    .text.pwm_set       motor_control.o
+    0x08004b2c   0x08004b2c   0x00000050   Code   RO          261    .text.read_user_data  flash_data_save.o
+    0x08004b7c   0x08004b7c   0x00000218   Code   RO          253    .text.save_user_data_checked  flash_data_save.o
+    0x08004d94   0x08004d94   0x00000060   Code   RO          448    .text.select_comp_ch_for_sector  drv_comp.o
+    0x08004df4   0x08004df4   0x00000024   Code   RO          424    .text.systick_delay_us  systick.o
+    0x08004e18   0x08004e18   0x00000010   Code   RO          273    .text.tool_mode_current  tool_mode.o
+    0x08004e28   0x08004e28   0x00000274   Code   RO          289    .text.tool_mode_duty  tool_mode.o
+    0x0800509c   0x0800509c   0x00000024   Code   RO          277    .text.tool_mode_gear  tool_mode.o
+    0x080050c0   0x080050c0   0x00000054   Code   RO          271    .text.tool_mode_init  tool_mode.o
+    0x08005114   0x08005114   0x000000ac   Code   RO          283    .text.tool_mode_key_event  tool_mode.o
+    0x080051c0   0x080051c0   0x000000dc   Code   RO          285    .text.tool_mode_key_handle  tool_mode.o
+    0x0800529c   0x0800529c   0x00000070   Code   RO          287    .text.tool_mode_pwm_update  tool_mode.o
+    0x0800530c   0x0800530c   0x0000004c   Code   RO          275    .text.tool_mode_restore_direction  tool_mode.o
+    0x08005358   0x08005358   0x00000040   Code   RO          291    .text.tool_mode_save_handle  tool_mode.o
+    0x08005398   0x08005398   0x00000094   Code   RO          279    .text.tool_mode_set_direction  tool_mode.o
+    0x0800542c   0x0800542c   0x00000010   Code   RO          281    .text.tool_mode_tick_1ms  tool_mode.o
+    0x0800543c   0x0800543c   0x00000110   Code   RO          160    .text.user_direction_handle  user_control.o
+    0x0800554c   0x0800554c   0x00000014   Code   RO          168    .text.user_gears_handle  user_control.o
+    0x08005560   0x08005560   0x00000234   Code   RO          150    .text.user_oc_handle  user_control.o
+    0x08005794   0x08005794   0x00000034   Code   RO          148    .text.user_para_init  user_control.o
+    0x080057c8   0x080057c8   0x000000e8   Code   RO          170    .text.user_screw_seat_stop_handle  user_control.o
+    0x080058b0   0x080058b0   0x00000200   Code   RO          178    .text.user_state_control  user_control.o
+    0x08005ab0   0x08005ab0   0x0000001a   Code   RO         1318    i.__ARM_common_switch8  002_mc_core_V1_01.lib(mc_core.o)
+    0x08005aca   0x08005aca   0x0000000e   Code   RO         1382    i.__scatterload_copy  mc_p.l(handlers.o)
+    0x08005ad8   0x08005ad8   0x00000002   Code   RO         1383    i.__scatterload_null  mc_p.l(handlers.o)
+    0x08005ada   0x08005ada   0x0000000e   Code   RO         1384    i.__scatterload_zeroinit  mc_p.l(handlers.o)
+    0x08005ae8   0x08005ae8   0x00000020   Data   RO         1381    Region$$Table       anon$$obj.o
 
 
-    Execution Region RW_IRAM1 (Exec base: 0x20000000, Load base: 0x08005a10, Size: 0x00000680, Max: 0x00001000, ABSOLUTE)
+    Execution Region RW_IRAM1 (Exec base: 0x20000000, Load base: 0x08005b08, Size: 0x00000688, Max: 0x00001000, ABSOLUTE)
 
     Exec Addr    Load Addr    Size         Type   Attr      Idx    E Section Name        Object
 
-    0x20000000   0x08005a10   0x00000034   Data   RW         1310    .data               002_mc_core_V1_01.lib(mc_core.o)
-    0x20000034   0x08005a44   0x00000006   Data   RW          448    .data.Comp_CH_Tab   drv_comp.o
-    0x2000003a   0x08005a4a   0x00000006   Data   RW          449    .data.Comp_CH_Tab1  drv_comp.o
-    0x20000040   0x08005a50   0x00000004   Data   RW         1245    .data.SystemCoreClock  system_mm32spin0230.o
-    0x20000044   0x08005a54   0x00000002   Data   RW          232    .data.battery_display_ms  led.o
-    0x20000046   0x08005a56   0x00000001   Data   RW          230    .data.tm_display_state  led.o
-    0x20000047   0x08005a57   0x00000001   PAD
-    0x20000048        -       0x0000011c   Zero   RW         1309    .bss                002_mc_core_V1_01.lib(mc_core.o)
+    0x20000000   0x08005b08   0x00000034   Data   RW         1314    .data               002_mc_core_V1_01.lib(mc_core.o)
+    0x20000034   0x08005b3c   0x00000006   Data   RW          452    .data.Comp_CH_Tab   drv_comp.o
+    0x2000003a   0x08005b42   0x00000006   Data   RW          453    .data.Comp_CH_Tab1  drv_comp.o
+    0x20000040   0x08005b48   0x00000004   Data   RW         1249    .data.SystemCoreClock  system_mm32spin0230.o
+    0x20000044   0x08005b4c   0x00000002   Data   RW          236    .data.battery_display_ms  led.o
+    0x20000046   0x08005b4e   0x00000001   Data   RW          234    .data.tm_display_state  led.o
+    0x20000047   0x08005b4f   0x00000001   PAD
+    0x20000048        -       0x0000011c   Zero   RW         1313    .bss                002_mc_core_V1_01.lib(mc_core.o)
     0x20000164        -       0x00000002   Zero   RW          136    .bss.ADC_IRQHandler.Ibus_Peak_Ocp_IT_count  mm32_it.o
-    0x20000166        -       0x00000014   Zero   RW          388    .bss.BatData        bat_com.o
-    0x2000017a        -       0x00000002   Zero   RW          179    .bss.CalibrationData  user_control.o
-    0x2000017c        -       0x00000002   Zero   RW          234    .bss.LedError_Run.bzCnt  led.o
-    0x2000017e        -       0x00000002   Zero   RW          235    .bss.LedError_Run.bzTime  led.o
-    0x20000180        -       0x00000001   Zero   RW          238    .bss.LedSoc_Run.PackSocStatus  led.o
-    0x20000181   0x08005a57   0x00000001   PAD
-    0x20000182        -       0x00000002   Zero   RW          236    .bss.LedSoc_Run.ms500cnt  led.o
-    0x20000184        -       0x00000002   Zero   RW          237    .bss.LedSoc_Run.msUpdateCnt  led.o
-    0x20000186        -       0x00000002   Zero   RW         1297    .bss.MC_Machine_State.break2stop_count  motor_control.o
-    0x20000188        -       0x00000002   Zero   RW         1295    .bss.MC_Machine_State.hbreak_count  motor_control.o
-    0x2000018a        -       0x00000001   Zero   RW         1298    .bss.MC_Machine_State.motionless_count  motor_control.o
-    0x2000018b   0x08005a57   0x00000001   PAD
-    0x2000018c        -       0x00000002   Zero   RW         1296    .bss.MC_Machine_State.sbreak_count  motor_control.o
-    0x2000018e        -       0x00000002   Zero   RW         1294    .bss.MC_Machine_State.wait_break_count  motor_control.o
-    0x20000190        -       0x00000004   Zero   RW          197    .bss.PI_p           user_control.o
-    0x20000194        -       0x00000004   Zero   RW          196    .bss.PI_sum_i       user_control.o
+    0x20000166        -       0x00000014   Zero   RW          392    .bss.BatData        bat_com.o
+    0x2000017a        -       0x00000002   Zero   RW          181    .bss.CalibrationData  user_control.o
+    0x2000017c        -       0x00000002   Zero   RW          238    .bss.LedError_Run.bzCnt  led.o
+    0x2000017e        -       0x00000002   Zero   RW          239    .bss.LedError_Run.bzTime  led.o
+    0x20000180        -       0x00000001   Zero   RW          242    .bss.LedSoc_Run.PackSocStatus  led.o
+    0x20000181   0x08005b4f   0x00000001   PAD
+    0x20000182        -       0x00000002   Zero   RW          240    .bss.LedSoc_Run.ms500cnt  led.o
+    0x20000184        -       0x00000002   Zero   RW          241    .bss.LedSoc_Run.msUpdateCnt  led.o
+    0x20000186        -       0x00000002   Zero   RW         1301    .bss.MC_Machine_State.break2stop_count  motor_control.o
+    0x20000188        -       0x00000002   Zero   RW         1299    .bss.MC_Machine_State.hbreak_count  motor_control.o
+    0x2000018a        -       0x00000001   Zero   RW         1302    .bss.MC_Machine_State.motionless_count  motor_control.o
+    0x2000018b   0x08005b4f   0x00000001   PAD
+    0x2000018c        -       0x00000002   Zero   RW         1300    .bss.MC_Machine_State.sbreak_count  motor_control.o
+    0x2000018e        -       0x00000002   Zero   RW         1298    .bss.MC_Machine_State.wait_break_count  motor_control.o
+    0x20000190        -       0x00000004   Zero   RW          199    .bss.PI_p           user_control.o
+    0x20000194        -       0x00000004   Zero   RW          198    .bss.PI_sum_i       user_control.o
     0x20000198        -       0x00000001   Zero   RW          137    .bss.TIM1_BRK_UP_TRG_COM_IRQHandler.u16PWMTimeCnt  mm32_it.o
-    0x20000199   0x08005a57   0x00000001   PAD
-    0x2000019a        -       0x00000002   Zero   RW          191    .bss.User_Temperature_Handler.NtcMosErrClr_Cnt  user_control.o
-    0x2000019c        -       0x00000002   Zero   RW          192    .bss.User_Temperature_Handler.NtcMosErr_Cnt  user_control.o
-    0x2000019e   0x08005a57   0x00000002   PAD
-    0x200001a0        -       0x00000004   Zero   RW          178    .bss.VERF_adc_data_avg  user_control.o
-    0x200001a4        -       0x00000002   Zero   RW          190    .bss.Volt_Handler.VBusOVP_Cnt  user_control.o
-    0x200001a6        -       0x00000002   Zero   RW          188    .bss.Volt_Handler.VBusRunUVP1_Cnt  user_control.o
-    0x200001a8        -       0x00000002   Zero   RW          189    .bss.Volt_Handler.VBusRunUVP2_Cnt  user_control.o
-    0x200001aa        -       0x00000002   Zero   RW          187    .bss.Volt_Handler.VBusStbUVP_Cnt  user_control.o
-    0x200001ac        -       0x00000001   Zero   RW          231    .bss.battery_trigger_previous  led.o
-    0x200001ad        -       0x00000001   Zero   RW          294    .bss.key_candidate  tool_mode.o
-    0x200001ae        -       0x00000001   Zero   RW          293    .bss.key_poll_count  tool_mode.o
-    0x200001af        -       0x00000001   Zero   RW          296    .bss.key_press_latched  tool_mode.o
-    0x200001b0        -       0x00000001   Zero   RW          295    .bss.key_stable_count  tool_mode.o
-    0x200001b1        -       0x00000001   Zero   RW          228    .bss.ledData        led.o
-    0x200001b2        -       0x00000001   Zero   RW          229    .bss.led_scan_index  led.o
-    0x200001b3   0x08005a57   0x00000001   PAD
+    0x20000199   0x08005b4f   0x00000001   PAD
+    0x2000019a        -       0x00000002   Zero   RW          193    .bss.User_Temperature_Handler.NtcMosErrClr_Cnt  user_control.o
+    0x2000019c        -       0x00000002   Zero   RW          194    .bss.User_Temperature_Handler.NtcMosErr_Cnt  user_control.o
+    0x2000019e   0x08005b4f   0x00000002   PAD
+    0x200001a0        -       0x00000004   Zero   RW          180    .bss.VERF_adc_data_avg  user_control.o
+    0x200001a4        -       0x00000002   Zero   RW          192    .bss.Volt_Handler.VBusOVP_Cnt  user_control.o
+    0x200001a6        -       0x00000002   Zero   RW          190    .bss.Volt_Handler.VBusRunUVP1_Cnt  user_control.o
+    0x200001a8        -       0x00000002   Zero   RW          191    .bss.Volt_Handler.VBusRunUVP2_Cnt  user_control.o
+    0x200001aa        -       0x00000002   Zero   RW          189    .bss.Volt_Handler.VBusStbUVP_Cnt  user_control.o
+    0x200001ac        -       0x00000001   Zero   RW          235    .bss.battery_trigger_previous  led.o
+    0x200001ad        -       0x00000001   Zero   RW          298    .bss.key_candidate  tool_mode.o
+    0x200001ae        -       0x00000001   Zero   RW          297    .bss.key_poll_count  tool_mode.o
+    0x200001af        -       0x00000001   Zero   RW          300    .bss.key_press_latched  tool_mode.o
+    0x200001b0        -       0x00000001   Zero   RW          299    .bss.key_stable_count  tool_mode.o
+    0x200001b1        -       0x00000001   Zero   RW          232    .bss.ledData        led.o
+    0x200001b2        -       0x00000001   Zero   RW          233    .bss.led_scan_index  led.o
+    0x200001b3   0x08005b4f   0x00000001   PAD
     0x200001b4        -       0x00000008   Zero   RW          205    .bss.machine_error_hold  user_control.o
-    0x200001bc        -       0x00000004   Zero   RW          290    .bss.mode_clock_ms  tool_mode.o
-    0x200001c0        -       0x00000020   Zero   RW         1289    .bss.motor_control_list  motor_control.o
-    0x200001e0        -       0x00000001   Zero   RW          203    .bss.motor_on_off_control.gToolTrigger_off_count  user_control.o
-    0x200001e1        -       0x00000001   Zero   RW          204    .bss.motor_on_off_control.gToolTrigger_on_count  user_control.o
-    0x200001e2   0x08005a57   0x00000002   PAD
-    0x200001e4        -       0x00000004   Zero   RW          198    .bss.pwm_duty_aim_PI_OUT  user_control.o
-    0x200001e8        -       0x00000001   Zero   RW         1290    .bss.pwm_set.pwm_add_count  motor_control.o
-    0x200001e9        -       0x00000001   Zero   RW         1292    .bss.pwm_set.pwm_add_fast_count  motor_control.o
-    0x200001ea        -       0x00000001   Zero   RW         1291    .bss.pwm_set.pwm_sub_count  motor_control.o
-    0x200001eb        -       0x00000001   Zero   RW         1293    .bss.pwm_set.pwm_sub_fast_count  motor_control.o
-    0x200001ec        -       0x00000004   Zero   RW          291    .bss.reverse_scene_full_start  tool_mode.o
-    0x200001f0        -       0x00000001   Zero   RW          292    .bss.reverse_scene_stage  tool_mode.o
-    0x200001f1        -       0x00000001   Zero   RW          300    .bss.scene_load_boost  tool_mode.o
-    0x200001f2   0x08005a57   0x00000002   PAD
-    0x200001f4        -       0x00000004   Zero   RW          303    .bss.scene_load_confirm_start  tool_mode.o
-    0x200001f8        -       0x00000001   Zero   RW          301    .bss.scene_load_pending  tool_mode.o
-    0x200001f9   0x08005a57   0x00000003   PAD
-    0x200001fc        -       0x00000004   Zero   RW          302    .bss.scene_load_run_start  tool_mode.o
-    0x20000200        -       0x00000001   Zero   RW          299    .bss.scene_load_running  tool_mode.o
-    0x20000201        -       0x00000001   Zero   RW          340    .bss.tm1650_cfg_dirty  tm1650.o
-    0x20000202        -       0x00000001   Zero   RW          339    .bss.tm1650_cfg_shadow  tm1650.o
-    0x20000203        -       0x00000001   Zero   RW          336    .bss.tm1650_dirty   tm1650.o
-    0x20000204        -       0x00000004   Zero   RW          338    .bss.tm1650_shadow  tm1650.o
-    0x20000208        -       0x00000001   Zero   RW          337    .bss.tm1650_step    tm1650.o
-    0x20000209        -       0x00000001   Zero   RW          297    .bss.tool_mode_key_raw  tool_mode.o
-    0x2000020a        -       0x00000001   Zero   RW          298    .bss.tool_mode_key_read_ok  tool_mode.o
-    0x2000020b        -       0x00000008   Zero   RW          289    .bss.tool_mode_list  tool_mode.o
-    0x20000213        -       0x00000001   Zero   RW          193    .bss.user_direction_handle.candidate_dir  user_control.o
-    0x20000214        -       0x00000001   Zero   RW          194    .bss.user_direction_handle.stable_count  user_control.o
-    0x20000215   0x08005a57   0x00000001   PAD
-    0x20000216        -       0x00000008   Zero   RW          233    .bss.user_led_control  led.o
-    0x2000021e   0x08005a57   0x00000002   PAD
-    0x20000220        -       0x00000054   Zero   RW          180    .bss.user_list      user_control.o
-    0x20000274        -       0x00000002   Zero   RW          181    .bss.user_oc_handle.IBusAvgOCP1_count  user_control.o
-    0x20000276        -       0x00000002   Zero   RW          182    .bss.user_oc_handle.IBusAvgOCP2_count  user_control.o
-    0x20000278        -       0x00000002   Zero   RW          183    .bss.user_oc_handle.IBusAvgOCP3_count  user_control.o
-    0x2000027a        -       0x00000002   Zero   RW          184    .bss.user_oc_handle.IBusAvgOCP4_count  user_control.o
-    0x2000027c        -       0x00000002   Zero   RW          186    .bss.user_oc_handle.IBusAvg_rec_count  user_control.o
-    0x2000027e        -       0x00000002   Zero   RW          185    .bss.user_oc_handle.IBusPeakOCP1_count  user_control.o
-    0x20000280        -       0x00000400   Zero   RW         1253    STACK               startup_mm32spin0230_keil.o
+    0x200001bc        -       0x00000004   Zero   RW          294    .bss.mode_clock_ms  tool_mode.o
+    0x200001c0        -       0x00000020   Zero   RW         1293    .bss.motor_control_list  motor_control.o
+    0x200001e0        -       0x00000001   Zero   RW          208    .bss.motor_on_off_control.gToolTrigger_off_count  user_control.o
+    0x200001e1        -       0x00000001   Zero   RW          209    .bss.motor_on_off_control.gToolTrigger_on_count  user_control.o
+    0x200001e2   0x08005b4f   0x00000002   PAD
+    0x200001e4        -       0x00000004   Zero   RW          200    .bss.pwm_duty_aim_PI_OUT  user_control.o
+    0x200001e8        -       0x00000001   Zero   RW         1294    .bss.pwm_set.pwm_add_count  motor_control.o
+    0x200001e9        -       0x00000001   Zero   RW         1296    .bss.pwm_set.pwm_add_fast_count  motor_control.o
+    0x200001ea        -       0x00000001   Zero   RW         1295    .bss.pwm_set.pwm_sub_count  motor_control.o
+    0x200001eb        -       0x00000001   Zero   RW         1297    .bss.pwm_set.pwm_sub_fast_count  motor_control.o
+    0x200001ec        -       0x00000004   Zero   RW          295    .bss.reverse_scene_full_start  tool_mode.o
+    0x200001f0        -       0x00000001   Zero   RW          296    .bss.reverse_scene_stage  tool_mode.o
+    0x200001f1        -       0x00000001   Zero   RW          304    .bss.scene_load_boost  tool_mode.o
+    0x200001f2   0x08005b4f   0x00000002   PAD
+    0x200001f4        -       0x00000004   Zero   RW          307    .bss.scene_load_confirm_start  tool_mode.o
+    0x200001f8        -       0x00000001   Zero   RW          305    .bss.scene_load_pending  tool_mode.o
+    0x200001f9   0x08005b4f   0x00000003   PAD
+    0x200001fc        -       0x00000004   Zero   RW          306    .bss.scene_load_run_start  tool_mode.o
+    0x20000200        -       0x00000001   Zero   RW          303    .bss.scene_load_running  tool_mode.o
+    0x20000201        -       0x00000001   Zero   RW          344    .bss.tm1650_cfg_dirty  tm1650.o
+    0x20000202        -       0x00000001   Zero   RW          343    .bss.tm1650_cfg_shadow  tm1650.o
+    0x20000203        -       0x00000001   Zero   RW          340    .bss.tm1650_dirty   tm1650.o
+    0x20000204        -       0x00000004   Zero   RW          342    .bss.tm1650_shadow  tm1650.o
+    0x20000208        -       0x00000001   Zero   RW          341    .bss.tm1650_step    tm1650.o
+    0x20000209        -       0x00000001   Zero   RW          301    .bss.tool_mode_key_raw  tool_mode.o
+    0x2000020a        -       0x00000001   Zero   RW          302    .bss.tool_mode_key_read_ok  tool_mode.o
+    0x2000020b        -       0x00000008   Zero   RW          293    .bss.tool_mode_list  tool_mode.o
+    0x20000213        -       0x00000001   Zero   RW          195    .bss.user_direction_handle.candidate_dir  user_control.o
+    0x20000214        -       0x00000001   Zero   RW          196    .bss.user_direction_handle.stable_count  user_control.o
+    0x20000215   0x08005b4f   0x00000001   PAD
+    0x20000216        -       0x00000008   Zero   RW          237    .bss.user_led_control  led.o
+    0x2000021e   0x08005b4f   0x00000002   PAD
+    0x20000220        -       0x00000054   Zero   RW          182    .bss.user_list      user_control.o
+    0x20000274        -       0x00000002   Zero   RW          183    .bss.user_oc_handle.IBusAvgOCP1_count  user_control.o
+    0x20000276        -       0x00000002   Zero   RW          184    .bss.user_oc_handle.IBusAvgOCP2_count  user_control.o
+    0x20000278        -       0x00000002   Zero   RW          185    .bss.user_oc_handle.IBusAvgOCP3_count  user_control.o
+    0x2000027a        -       0x00000002   Zero   RW          186    .bss.user_oc_handle.IBusAvgOCP4_count  user_control.o
+    0x2000027c        -       0x00000002   Zero   RW          188    .bss.user_oc_handle.IBusAvg_rec_count  user_control.o
+    0x2000027e        -       0x00000002   Zero   RW          187    .bss.user_oc_handle.IBusPeakOCP1_count  user_control.o
+    0x20000280        -       0x00000002   Zero   RW          203    .bss.user_screw_seat_stop_handle.seat_stop_count  user_control.o
+    0x20000282        -       0x00000001   Zero   RW          204    .bss.user_screw_seat_stop_handle.seat_stop_gear  user_control.o
+    0x20000283   0x08005b4f   0x00000005   PAD
+    0x20000288        -       0x00000400   Zero   RW         1257    STACK               startup_mm32spin0230_keil.o
 
 
 ==============================================================================
@@ -3432,7 +3459,7 @@ Image component sizes
         84         12          0          0          0       4911   hal_rcc.o
        868         20          0          0          0      22873   hal_tim.o
       1784        180          0          3         20       5214   led.o
-       432         28          0          0          0       2944   main.o
+       436         28          0          0          0       2945   main.o
        726         88          0          0          3       8014   mm32_it.o
       3036        284          0          0         45      11327   motor_control.o
         40         14        192          0       1024        728   startup_mm32spin0230_keil.o
@@ -3440,12 +3467,12 @@ Image component sizes
        112         20          0          0          0       3946   systick.o
        952         32          0          0          8       6193   tm1650.o
       1572        156          0          0         34       7243   tool_mode.o
-      2592        256          0          0        138      12107   user_control.o
+      2836        280          0          0        141      12811   user_control.o
 
     ----------------------------------------------------------------------
-     18544       1534        224         20       1308     164331   Object Totals
+     18792       1558        224         20       1316     165036   Object Totals
          0          0         32          0          0          0   (incl. Generated)
-        38          0          0          1         16          0   (incl. Padding)
+        38          0          0          1         21          0   (incl. Padding)
 
     ----------------------------------------------------------------------
 
@@ -3498,15 +3525,15 @@ Image component sizes
 
       Code (inc. data)   RO Data    RW Data    ZI Data      Debug   
 
-     22832       1674        224         72       1592     165355   Grand Totals
-     22832       1674        224         72       1592     165355   ELF Image Totals
-     22832       1674        224         72          0          0   ROM Totals
+     23080       1698        224         72       1600     166060   Grand Totals
+     23080       1698        224         72       1600     166060   ELF Image Totals
+     23080       1698        224         72          0          0   ROM Totals
 
 ==============================================================================
 
-    Total RO  Size (Code + RO Data)                23056 (  22.52kB)
-    Total RW  Size (RW Data + ZI Data)              1664 (   1.62kB)
-    Total ROM Size (Code + RO Data + RW Data)      23128 (  22.59kB)
+    Total RO  Size (Code + RO Data)                23304 (  22.76kB)
+    Total RW  Size (RW Data + ZI Data)              1672 (   1.63kB)
+    Total ROM Size (Code + RO Data + RW Data)      23376 (  22.83kB)
 
 ==============================================================================
 

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "D:\mym\NXN\3.yuantuo\V10_qizhiji\core\NX32F002-V1_01-lib-release\tests\tool_mode\run_tests.py", line 113, in <module>
+    main()
+    ~~~~^^
+  File "D:\mym\NXN\3.yuantuo\V10_qizhiji\core\NX32F002-V1_01-lib-release\tests\tool_mode\run_tests.py", line 80, in main
+    execute(image, args.baseline, args.case)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\mym\NXN\3.yuantuo\V10_qizhiji\core\NX32F002-V1_01-lib-release\tests\tool_mode\run_tests.py", line 107, in execute
+    raise AssertionError(f'{"old firmware" if baseline else "mode/storage"} case {case}, test_tool_mode.c:{line}, after {checks} checks')
+AssertionError: mode/storage case 37, test_tool_mode.c:1068, after 4 checks

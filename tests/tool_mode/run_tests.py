@@ -2,11 +2,12 @@
 import argparse
 import importlib.util
 from pathlib import Path
+import re
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-06-scene-current-check/control-tests'
+OUT = ROOT / '.planning/2026-11-06-scene-seat-stop/control-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)
@@ -29,6 +30,35 @@ def extract_last_function(path, signature):
     raise ValueError(f'Unbalanced function in {path}')
 
 
+def extract_main_control_frame(path):
+    """抽取主循环相关调用顺序及原电机使能if/else，避免测试重写保护门控。"""
+    source = path.read_text(encoding='utf-8')
+    signature = 'if(user_list.flag.bits.gToolEn && Bat_Com_CanRun() &&'
+    gate_start = source.index(signature)
+    gate = runner.extract_function(path, signature)
+    tail = source[gate_start + len(gate):]
+    if not tail.lstrip().startswith('else'):
+        raise ValueError(f'Missing motor-enable else branch in {path}')
+    opening = tail.index('{')
+    depth = 0
+    for pos in range(opening, len(tail)):
+        if tail[pos] == '{':
+            depth += 1
+        elif tail[pos] == '}':
+            depth -= 1
+            if depth == 0:
+                gate += tail[:pos + 1]
+                break
+    else:
+        raise ValueError(f'Unbalanced motor-enable else branch in {path}')
+    start = source.index('user_oc_handle();')
+    calls = re.findall(
+        r'\b(?:user_oc_handle|user_screw_seat_stop_handle|user_state_control|error_hold_updata)\s*\(\s*\)\s*;',
+        source[start:gate_start])
+    return ('/** @brief 执行主循环实际电流、停机、状态、锁存顺序及电机安全门控。 */\n'
+            'void test_main_control_frame(void)\n{\n' + '\n'.join(calls) + '\n' + gate + '\n}')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--baseline', action='store_true')
@@ -42,14 +72,18 @@ def main():
             'User_list_Struct user_list;', 'Machine_ERROR_HOLD machine_error_hold;',
             'Mc_core_list mc_core_list;', 'Motor_Control_list motor_control_list;']
     if not args.baseline:
-        code.append('#include "tool_mode.h"')
+        code += ['#include "tool_mode.h"', '#include "bat_com.h"']
     for signature in ['void user_para_init(void)', 'void pwm_duty_aim_deal(void)', 'void user_gears_handle(void)']:
         code.append(runner.extract_function(prefix / 'USER/user_control.c', signature))
     if not args.baseline:
         code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void user_direction_handle(void)'))
         code.append(extract_last_function(ROOT / 'USER/user_control.c', 'void user_oc_handle(void)'))
+        code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void user_screw_seat_stop_handle(void)'))
+        code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void error_hold_updata(void)'))
+        code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void user_state_control(void)'))
         code.append(runner.extract_function(ROOT / 'MOTOR_CONTROL/motor_control.c', 'void pwm_set(void)'))
         code.append(runner.extract_function(ROOT / 'MOTOR_CONTROL/motor_control.c', 'void mc_init(void)'))
+        code.append(extract_main_control_frame(ROOT / 'USER/main.c'))
     code += ['#define TEST_BASELINE ' + str(int(args.baseline)),
              '#define TEST_ONLY_CASE ' + str(args.case),
              '#include "' + (ROOT / 'tests/tool_mode/test_tool_mode.c').as_posix() + '"']

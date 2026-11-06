@@ -101,6 +101,7 @@ void io_debug_init(void)
 /**
  * @brief  主函数 - 系统初始化及主循环
  *         完成外设初始化、参数校准、电压/温度检测及电机控制状态机调度
+ *         1ms任务在更新电流及模式后判定情景到位停机，再由工具状态机处理停机请求。
  */
 int main(void)
 {
@@ -256,6 +257,10 @@ int main(void)
 				motor_control_list.time_count_60_degree_filter=0;
 				motor_control_list.motor_speed=0;
 			}
+			#endif
+			#if(!Wrench_EN)
+			/* 双模式使用情景到位保护；旧扳手分支继续由其按键处理维护自动停机。 */
+			user_screw_seat_stop_handle();
 			#endif
 			/* 工具状态机控制（停止/运行/报错/休眠） */
 			user_state_control();
