@@ -32,4 +32,5 @@
   ..\DRIVE\inc\drv_pwm.h ..\USER\inc\parameter.h \
   ..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h ..\USER\inc\board.h \
   ..\DRIVE\inc\drv_adc.h ..\USER\inc\user_control.h \
-  ..\SYSTEM\inc\systick.h ..\MOTOR_CONTROL\motor_config.h
+  ..\SYSTEM\inc\systick.h ..\MOTOR_CONTROL\motor_config.h \
+  ..\USER\inc\tool_mode.h

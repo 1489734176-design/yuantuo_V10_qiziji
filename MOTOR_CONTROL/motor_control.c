@@ -7,6 +7,7 @@
 #include "user_control.h"
 #include "systick.h"
 #include "motor_config.h"
+#include "tool_mode.h"
 
 /* 全局电机控制列表实例 */
 Motor_Control_list motor_control_list;
@@ -274,6 +275,7 @@ void motor_block_detect(void)
 *        - pwm_actual_runing_data: 实际输出占空比（快速跟踪）
 *        支持电流限流功能：当电流超限时强制降低占空比
 *        支持重启功能：正反转切换时限制最小占空比
+*        实际PWM更新后记录反转情景首满值时刻，不改变原斜坡及保护
 ******************************************************************************/
 void pwm_set(void)
 {
@@ -485,6 +487,7 @@ void pwm_set(void)
 
 	/* 更新PWM硬件寄存器 */
 	PwmDutyUpdate(mc_core_list.pwm_actual_runing_data);
+	tool_mode_pwm_update((uint16_t)mc_core_list.pwm_actual_runing_data);
 }
 
 /******************************************************************************

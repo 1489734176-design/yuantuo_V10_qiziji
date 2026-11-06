@@ -30,6 +30,7 @@
 #include "motor_control.h"
 #include "led.h"
 #include "Bat_com.h"
+#include "tool_mode.h"
 
 #include "motor_config.h"
 #include "drv_comp.h"
@@ -441,6 +442,9 @@ void ADC_IRQHandler(void)
     }
 }
 
+/**
+ * @brief 处理PWM更新及保护中断，每1ms更新通信、反转情景时钟与前台标志。
+ */
 void TIM1_BRK_UP_TRG_COM_IRQHandler(void)
 {
 	static unsigned char u16PWMTimeCnt = 0;
@@ -467,6 +471,7 @@ void TIM1_BRK_UP_TRG_COM_IRQHandler(void)
 #if BAT_COM_EN
 			Bat_Com_Tick1ms();
 #endif
+			tool_mode_tick_1ms();
 			user_list.u8_1ms_flag=1;
 			u16PWMTimeCnt = 0;
 

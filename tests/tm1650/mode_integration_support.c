@@ -28,11 +28,18 @@ void test_mode_init(void)
 	tool_mode_init();
 }
 
+/** @brief 返回当前方向模式和两类挡位，供真实总线集成测试检查可见行为。 */
 uint32_t test_mode_state(void)
 {
-	return (uint32_t)tool_mode_list.mode |
-		((uint32_t)tool_mode_list.speed_gear << 8) |
-		((uint32_t)tool_mode_list.scene_gear << 16);
+	return (uint32_t)tool_mode_current()->mode |
+		((uint32_t)tool_mode_current()->speed_gear << 8) |
+		((uint32_t)tool_mode_current()->scene_gear << 16);
+}
+
+/** @brief 模拟已通过方向门控后的方向提交，键盘及显示仍走真实总线。 */
+void test_mode_direction(uint32_t reverse)
+{
+	tool_mode_set_direction(reverse!=0);
 }
 
 void test_power_down(void)

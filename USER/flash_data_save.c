@@ -10,11 +10,13 @@
 #define FLASH_SLOT_COUNT    (FLASH_PAGE_BYTES/FLASH_SLOT_BYTES)
 #define FLASH_RECORD_WORDS  (8u)
 #define FLASH_RECORD_MAGIC (0xa65au)
-#define FLASH_RECORD_VERSION (1u)
+#define FLASH_RECORD_VERSION (2u)
+#define FLASH_RECORD_VERSION_SINGLE (1u)
 #define FLASH_LEGACY_MAGIC  (0x55aau)
 #define FLASH_LEGACY_SLOTS  (10u)
 
-/* 新记录8半字：最后提交标志、版本、模式、调速档、情景档、序号低/高、CRC16。 */
+/* 8半字：提交标志、版本、双向模式、双向调速档、正转情景档、序号低/高、CRC16。
+ * 双向字段低字节正转、高字节反转；反转情景固定4档，沿用原20字节日志槽。 */
 typedef struct
 {
 	uint32_t page;
@@ -58,17 +60,23 @@ static uint16_t flash_record_crc(const uint16_t *record)
 }
 
 /**
- * @brief 读取并校验一条日志，只有提交标志、版本、范围和CRC均有效才返回1。
+ * @brief 校验双向版本2或单向版本1记录，仅提交标志、字段范围及CRC有效才返回1。
  */
 static uint8_t flash_read_record(uint32_t address,uint16_t *record)
 {
 	uint8_t i;
 	if(read_half_data(address)!=FLASH_RECORD_MAGIC) return 0;
 	for(i=0;i<FLASH_RECORD_WORDS;i++) record[i]=read_half_data(address+2u*i);
-	/* CRC和范围同时检查，损坏/旧格式/未完成记录均不成为最新设置。 */
-	return record[1]==FLASH_RECORD_VERSION && record[2]<=TOOL_MODE_SCENE &&
-		record[3]>=1 && record[3]<=4 && record[4]>=1 && record[4]<=3 &&
-		record[7]==flash_record_crc(record);
+	/* 旧版本按原字段校验，新版本的正反转字节分别校验，未提交或损坏记录跳过。 */
+	if(record[7]!=flash_record_crc(record) || record[4]<1 || record[4]>3) return 0;
+	if(record[1]==FLASH_RECORD_VERSION_SINGLE)
+	{
+		return record[2]<=TOOL_MODE_SCENE && record[3]>=1 && record[3]<=4;
+	}
+	return record[1]==FLASH_RECORD_VERSION &&
+		(record[2] & 0xffu)<=TOOL_MODE_SCENE && (record[2]>>8)<=TOOL_MODE_SCENE &&
+		(record[3] & 0xffu)>=1 && (record[3] & 0xffu)<=4 &&
+		(record[3]>>8)>=1 && (record[3]>>8)<=4;
 }
 
 /**
@@ -116,6 +124,7 @@ static void flash_find_latest(flash_latest_t *latest)
 			latest->valid=1;
 			latest->legacy=1;
 			latest->page=FLASH_PAGE1_ADDRESS;
+			latest->record[1]=FLASH_RECORD_VERSION_SINGLE;
 			latest->record[2]=TOOL_MODE_SPEED;
 			latest->record[3]=read_half_data(address+2)+1u;
 			latest->record[4]=1;
@@ -146,7 +155,7 @@ static uint32_t flash_find_empty_slot(uint32_t page)
 }
 
 /**
- * @brief 以双页事务日志保存模式和挡位，最后提交标志并读回校验；成功返回1。
+ * @brief 以双页事务日志保存正反转独立模式和挡位，最后提交并读回校验；成功返回1。
  *        调用者须确认电机完全停止，任意擦写或校验失败均保留上次有效记录。
  */
 uint8_t save_user_data_checked(void)
@@ -161,9 +170,12 @@ uint8_t save_user_data_checked(void)
 	uint8_t i;
 	uint8_t result=0;
 	uint16_t erase_word;
+	const tool_mode_setting_t *forward=&tool_mode_list.setting[TOOL_DIRECTION_FORWARD];
+	const tool_mode_setting_t *reverse=&tool_mode_list.setting[TOOL_DIRECTION_REVERSE];
 	/* 拒绝无效RAM配置，失败不清待保存标志。调用者保证前台完全停机。 */
-	if(tool_mode_list.mode>TOOL_MODE_SCENE || tool_mode_list.speed_gear<1 ||
-	   tool_mode_list.speed_gear>4 || tool_mode_list.scene_gear<1 || tool_mode_list.scene_gear>3)
+	if(forward->mode>TOOL_MODE_SCENE || forward->speed_gear<1 || forward->speed_gear>4 ||
+	   forward->scene_gear<1 || forward->scene_gear>3 || reverse->mode>TOOL_MODE_SCENE ||
+	   reverse->speed_gear<1 || reverse->speed_gear>4 || reverse->scene_gear!=4)
 	{
 		return 0;
 	}
@@ -183,9 +195,9 @@ uint8_t save_user_data_checked(void)
 	sequence=latest.valid ? latest.sequence+1u : 1u;
 	record[0]=FLASH_RECORD_MAGIC;
 	record[1]=FLASH_RECORD_VERSION;
-	record[2]=tool_mode_list.mode;
-	record[3]=tool_mode_list.speed_gear;
-	record[4]=tool_mode_list.scene_gear;
+	record[2]=(uint16_t)forward->mode | ((uint16_t)reverse->mode<<8);
+	record[3]=(uint16_t)forward->speed_gear | ((uint16_t)reverse->speed_gear<<8);
+	record[4]=forward->scene_gear;
 	record[5]=(uint16_t)sequence;
 	record[6]=(uint16_t)(sequence>>16);
 	record[7]=flash_record_crc(record);
@@ -229,7 +241,7 @@ void save_user_data(void)
 }
 
 /**
- * @brief 上电恢复最新有效模式和挡位，无有效记录时使用默认设置并避免写Flash。
+ * @brief 恢复正反转独立设置，兼容旧单向记录为正转设置，无有效记录采用默认。
  */
 void read_user_data(void)
 {
@@ -239,9 +251,14 @@ void read_user_data(void)
 	flash_find_latest(&latest);
 	if(latest.valid)
 	{
-		tool_mode_list.mode=(uint8_t)latest.record[2];
-		tool_mode_list.speed_gear=(uint8_t)latest.record[3];
-		tool_mode_list.scene_gear=(uint8_t)latest.record[4];
+		tool_mode_list.setting[TOOL_DIRECTION_FORWARD].mode=(uint8_t)latest.record[2];
+		tool_mode_list.setting[TOOL_DIRECTION_FORWARD].speed_gear=(uint8_t)latest.record[3];
+		tool_mode_list.setting[TOOL_DIRECTION_FORWARD].scene_gear=(uint8_t)latest.record[4];
+		if(latest.record[1]==FLASH_RECORD_VERSION)
+		{
+			tool_mode_list.setting[TOOL_DIRECTION_REVERSE].mode=(uint8_t)(latest.record[2]>>8);
+			tool_mode_list.setting[TOOL_DIRECTION_REVERSE].speed_gear=(uint8_t)(latest.record[3]>>8);
+		}
 	}
 	user_list.gears_level=tool_mode_gear()-1;
 	user_list.flag.bits.gAutoStopEn=latest.legacy_auto_stop;

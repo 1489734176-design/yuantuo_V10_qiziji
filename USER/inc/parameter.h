@@ -26,18 +26,19 @@
 #define BATTERY_LED_TIME (5000u) // 每次重新扣动扳机，电量灯显示5s
 
 /* 双模式挡位配置：修改本节数值并重新编译即可生效。
- * 灯号填写原理图LED编号，范围5～8；同一时刻只亮当前挡对应的一个灯。
+ * 灯号填写原理图LED编号，范围5～8；调速累加1档至当前档的灯，情景仅亮当前档灯。
  * 占空比单位为百分比，范围15～100，最低输出仍受MIN_TOOL_DUTY限制。
  * 调速模式：扳机从最低占空比连续调节到本挡上限。
  * 情景模式：每挡固定目标占空比，扳机只控制启停，软启动及保护继续生效。
  */
-#define TOOL_SPEED_GEAR1_LED          (8u)  // 调速1挡灯号
-#define TOOL_SPEED_GEAR2_LED          (7u)  // 调速2挡灯号
-#define TOOL_SPEED_GEAR3_LED          (6u)  // 调速3挡灯号
-#define TOOL_SPEED_GEAR4_LED          (5u)  // 调速4挡灯号
+#define TOOL_SPEED_GEAR1_LED          (8u)  // 调速1挡点亮LED8
+#define TOOL_SPEED_GEAR2_LED          (7u)  // 调速2挡在前挡基础上增加LED7
+#define TOOL_SPEED_GEAR3_LED          (6u)  // 调速3挡在前挡基础上增加LED6
+#define TOOL_SPEED_GEAR4_LED          (5u)  // 调速4挡在前挡基础上增加LED5
 #define TOOL_SCENE_GEAR1_LED          (8u)  // 情景1挡灯号
 #define TOOL_SCENE_GEAR2_LED          (7u)  // 情景2挡灯号
 #define TOOL_SCENE_GEAR3_LED          (6u)  // 情景3挡灯号
+#define TOOL_REVERSE_SCENE_GEAR4_LED  (5u)  // 反转情景固定4挡灯号
 
 #define TOOL_SPEED_GEAR1_DUTY_PERCENT (38u) // 调速1挡占空比上限，单位%
 #define TOOL_SPEED_GEAR2_DUTY_PERCENT (58u) // 调速2挡占空比上限，单位%
@@ -46,6 +47,9 @@
 #define TOOL_SCENE_GEAR1_DUTY_PERCENT (18u) // 情景1挡固定目标，单位%
 #define TOOL_SCENE_GEAR2_DUTY_PERCENT (100u) // 情景2挡固定目标，单位%
 #define TOOL_SCENE_GEAR3_DUTY_PERCENT (100u) // 情景3挡固定目标，单位%
+#define TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT (100u) // 反转情景升速目标，单位%
+#define TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT  (15u)  // 反转情景降速后目标，单位%
+#define TOOL_REVERSE_SCENE_FULL_TIME_MS      (850u) // 达到升速目标后的保持时间，单位ms
 
 /* 编译时检查配置范围，避免错误灯号移位或超出有效占空比。 */
 #define TOOL_MODE_LED_VALID(number) ((number)>=5 && (number)<=8)
@@ -53,14 +57,20 @@
 #if !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR1_LED) || !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR2_LED) || \
     !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR3_LED) || !TOOL_MODE_LED_VALID(TOOL_SPEED_GEAR4_LED) || \
     !TOOL_MODE_LED_VALID(TOOL_SCENE_GEAR1_LED) || !TOOL_MODE_LED_VALID(TOOL_SCENE_GEAR2_LED) || \
-    !TOOL_MODE_LED_VALID(TOOL_SCENE_GEAR3_LED)
+    !TOOL_MODE_LED_VALID(TOOL_SCENE_GEAR3_LED) || !TOOL_MODE_LED_VALID(TOOL_REVERSE_SCENE_GEAR4_LED)
 #error "Mode LED numbers must be in the range 5..8."
 #endif
 #if !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR1_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR2_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR3_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR4_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR1_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR2_DUTY_PERCENT) || \
-    !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR3_DUTY_PERCENT)
+    !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR3_DUTY_PERCENT) || \
+    !TOOL_MODE_DUTY_VALID(TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT) || \
+    !TOOL_MODE_DUTY_VALID(TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT)
 #error "Mode duty percentages must be in the range 15..100."
+#endif
+#if TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT>TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT || \
+    TOOL_REVERSE_SCENE_FULL_TIME_MS<1 || TOOL_REVERSE_SCENE_FULL_TIME_MS>60000
+#error "Reverse scene requires low duty <= full duty and a hold time in 1..60000 ms."
 #endif
 #undef TOOL_MODE_LED_VALID
 #undef TOOL_MODE_DUTY_VALID
@@ -248,9 +258,9 @@
 
 
 
-	#define IBus_Smart_Peak_OCP1                      (60.00)/*unit:a*/
+	#define IBus_Smart_Peak_OCP1                      (28.00)/*unit:a*/
 	#define IBus_Smart_Peak_OCP1_AdcValue             (u16)(IBus_Smart_Peak_OCP1*CURRENT_ADC_PER_A)
-	#define IBus_Smart_Peak_OCP1_MS                   (800) //ms
+	#define IBus_Smart_Peak_OCP1_MS                   (100) //ms
 	#define IBus_Smart_OCP1_MS_Operation_Value        (u16)(32768.0f/((float)IBus_Smart_Peak_OCP1_MS*SLOWLOOP_FRE/1000.0f))
 
 	#define IBus_Smart_Peak_OCP2                      (70.00)/*unit:a*/

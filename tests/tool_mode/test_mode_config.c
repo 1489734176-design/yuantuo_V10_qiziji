@@ -27,23 +27,27 @@ void Bsp_Key_Init(void) {}
 void Bsp_dir_init(void) {}
 
 /**
- * @brief 验证默认参数和独立覆盖参数下，七挡灯号及目标占空比均实际生效。
+ * @brief 验证默认参数和独立覆盖参数下，调速累计灯号、情景单灯、目标占空比及反转保持时间均生效。
  *        期望计数按1874周期手算，避免根据被测函数重新生成期望。
  */
 uint32_t run_tests(void)
 {
 #ifdef TEST_MODE_CONFIG_OVERRIDE
-	const uint8_t speed_masks[]={0x08,0x40,0x10,0x20};
+	const uint8_t speed_masks[]={0x08,0x48,0x58,0x78};
 	const uint8_t scene_masks[]={0x20,0x40,0x10};
 	const uint16_t speed_max[]={468,843,1218,1592};
 	const uint16_t speed_middle[]={374,561,749,936};
 	const uint16_t scene_duty[]={655,1030,1405};
+	const uint8_t reverse_mask=0x20;
+	const uint16_t reverse_full=1686,reverse_low=374,reverse_time=321;
 #else
-	const uint8_t speed_masks[]={0x40,0x20,0x10,0x08};
-	const uint8_t scene_masks[]={0x40,0x10,0x08};
+	const uint8_t speed_masks[]={0x40,0x60,0x70,0x78};
+	const uint8_t scene_masks[]={0x40,0x20,0x10};
 	const uint16_t speed_max[]={712,1086,1461,1874};
 	const uint16_t speed_middle[]={496,683,870,1077};
 	const uint16_t scene_duty[]={337,1874,1874};
+	const uint8_t reverse_mask=0x08;
+	const uint16_t reverse_full=1874,reverse_low=281,reverse_time=850;
 #endif
 	uint8_t i;
 	user_list.user_state=TOOL_STOP;
@@ -52,22 +56,41 @@ uint32_t run_tests(void)
 	for(i=0;i<4;i++)
 	{
 		test_case=i+1;
-		tool_mode_list.speed_gear=i+1;
+		tool_mode_current()->speed_gear=i+1;
 		UO_Led_Handler();
 		CHECK(TM1650_GetDigit(0)==speed_masks[i] && TM1650_GetDigit(1)==0);
 		CHECK(tool_mode_duty(0)==281 && tool_mode_duty(281)==281);
 		CHECK(tool_mode_duty(1077)==speed_middle[i]);
 		CHECK(tool_mode_duty(1874)==speed_max[i] && tool_mode_duty(65535)==speed_max[i]);
 	}
-	tool_mode_list.mode=TOOL_MODE_SCENE;
+	tool_mode_current()->mode=TOOL_MODE_SCENE;
 	for(i=0;i<3;i++)
 	{
 		test_case=i+5;
-		tool_mode_list.scene_gear=i+1;
+		tool_mode_current()->scene_gear=i+1;
 		UO_Led_Handler();
 		CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==scene_masks[i]);
 		CHECK(tool_mode_duty(0)==scene_duty[i]);
 		CHECK(tool_mode_duty(1077)==scene_duty[i] && tool_mode_duty(1874)==scene_duty[i]);
 	}
+	test_case=8;
+	tool_mode_set_direction(TOOL_DIRECTION_REVERSE);
+	tool_mode_key_event(TOOL_MODE_KEY_SCENE);
+	UO_Led_Handler();
+	CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==reverse_mask);
+	CHECK(tool_mode_gear()==4 && tool_mode_duty(281)==reverse_full);
+	user_list.flag.bits.gToolTrigger=1;
+	user_list.flag.bits.gToolEn=1;
+	mc_core_list.motor_en=1;
+	motor_control_list.bldc_state=MOTOR_RUN;
+	mc_core_list.pwm_actual_runing_data=reverse_full;
+	tool_mode_pwm_update(reverse_full);
+	CHECK(tool_mode_duty(281)==reverse_full);
+	{
+		uint16_t milliseconds;
+		for(milliseconds=0;milliseconds<reverse_time-1;milliseconds++) tool_mode_tick_1ms();
+	}
+	CHECK(tool_mode_duty(281)==reverse_full);
+	tool_mode_tick_1ms(); CHECK(tool_mode_duty(281)==reverse_low);
 	return 0;
 }

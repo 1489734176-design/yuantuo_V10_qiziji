@@ -1366,7 +1366,7 @@ void power_on_fly_machine_handle(void)
 /**
  * @brief  方向检测处理
  *        读取机械换向开关状态，滤波10次确认后设置电机旋转方向
- *        仅在电机停止且运行使能撤销后允许换向
+ *        停稳并撤销运行使能后换向；双调速沿用当前挡位，上电及情景切换恢复记忆
  */
 void user_direction_handle(void)
 {
@@ -1406,6 +1406,7 @@ void user_direction_handle(void)
 		{
 			user_list.flag.bits.gToolDir=requested_dir;
 			mc_core_list.mc_dir=requested_dir;
+			tool_mode_restore_direction(requested_dir==Tool_Dir_CCW_Value);
 			user_list.direction_initialized=1;
 			user_list.dir_retrig_need=0;
 			user_list.dir_valid=1;
@@ -1434,6 +1435,7 @@ void user_direction_handle(void)
 	}
 	user_list.flag.bits.gToolDir=requested_dir;
 	mc_core_list.mc_dir=requested_dir;
+	tool_mode_set_direction(requested_dir==Tool_Dir_CCW_Value);
 	user_list.dir_valid=1;
 	user_list.direction_ready=1;
 }

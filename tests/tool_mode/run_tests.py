@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-04-tm1650/control-tests'
+OUT = ROOT / '.planning/2026-11-05-reverse-scene-memory/control-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)
@@ -16,6 +16,7 @@ spec.loader.exec_module(runner)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--baseline', action='store_true')
+    parser.add_argument('--case', type=int, default=0, help='run only the numbered case; default runs all')
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / 'tm1650.h').write_text('#include <stdint.h>\nuint8_t TM1650_ReadKey(uint8_t *key);\n', encoding='utf-8')
@@ -29,8 +30,10 @@ def main():
     for signature in ['void user_para_init(void)', 'void pwm_duty_aim_deal(void)', 'void user_gears_handle(void)']:
         code.append(runner.extract_function(prefix / 'USER/user_control.c', signature))
     if not args.baseline:
+        code.append(runner.extract_function(ROOT / 'USER/user_control.c', 'void user_direction_handle(void)'))
         code.append(runner.extract_function(ROOT / 'MOTOR_CONTROL/motor_control.c', 'void pwm_set(void)'))
     code += ['#define TEST_BASELINE ' + str(int(args.baseline)),
+             '#define TEST_ONLY_CASE ' + str(args.case),
              '#include "' + (ROOT / 'tests/tool_mode/test_tool_mode.c').as_posix() + '"']
     source = OUT / ('baseline.c' if args.baseline else 'test_main.c')
     source.write_text('\n'.join(code), encoding='utf-8')
@@ -48,10 +51,10 @@ def main():
                  ROOT / 'CMSIS/Core/Include']:
         command += ['-I', str(path)]
     subprocess.run(command, check=True, cwd=ROOT)
-    execute(image, args.baseline)
+    execute(image, args.baseline, args.case)
 
 
-def execute(image, baseline):
+def execute(image, baseline, only_case=0):
     import struct
     sys.path.insert(0, str(ROOT / '.tmp_protocol/test_deps'))
     from elftools.elf.elffile import ELFFile
@@ -76,7 +79,8 @@ def execute(image, baseline):
     line, case, checks = map(word, ['test_failure_line', 'test_case', 'test_checks'])
     if line:
         raise AssertionError(f'{"old firmware" if baseline else "mode/storage"} case {case}, test_tool_mode.c:{line}, after {checks} checks')
-    print(f'PASS: {case} cases, {checks} checks (real ARM C, simulated key/Flash hardware; not a bench test)')
+    label = f'case {only_case}' if only_case else f'{case} cases'
+    print(f'PASS: {label}, {checks} checks (real ARM C, simulated key/Flash hardware; not a bench test)')
 
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-05-mode-fixes/integration-tests'
+OUT = ROOT / '.planning/2026-11-05-reverse-scene-memory/integration-tests'
 spec = importlib.util.spec_from_file_location('tm1650_bus_runner', ROOT / 'tests/tm1650/run_tests.py')
 bus = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bus)
@@ -97,19 +97,20 @@ def test_physical_k3_to_scene_display(image):
     assert board.state() == (1, 1, 1), 'holding K3 repeated the event'
     board.press(0x46)
     assert board.state() == (1, 1, 2)
-    board.display([0, 0x10, 0, 0])
+    board.display([0, 0x20, 0, 0])
     board.press(0x46)
     assert board.state() == (1, 1, 3)
-    board.display([0, 0x08, 0, 0])
+    board.display([0, 0x10, 0, 0])
     board.press(0x46)
     assert board.state() == (1, 1, 1)
     board.display([0, 0x40, 0, 0])
 
 
 def test_physical_k2_speed_order_and_mode_memory(image):
+    """验证K2累计点亮调速灯，并保留同方向的模式档位记忆。"""
     board = ModeBoard(image)
     board.display([0x40, 0, 0, 0])
-    for gear, mask in [(2, 0x20), (3, 0x10), (4, 0x08), (1, 0x40), (2, 0x20)]:
+    for gear, mask in [(2, 0x60), (3, 0x70), (4, 0x78), (1, 0x40), (2, 0x60)]:
         board.press(0x47)
         assert board.state() == (0, gear, 1)
         board.display([mask, 0, 0, 0])
@@ -118,10 +119,10 @@ def test_physical_k2_speed_order_and_mode_memory(image):
     board.display([0, 0x40, 0, 0])
     board.press(0x46)
     assert board.state() == (1, 2, 2)
-    board.display([0, 0x10, 0, 0])
+    board.display([0, 0x20, 0, 0])
     board.press(0x47)
     assert board.state() == (0, 2, 2), 'K2 failed to restore the speed gear'
-    board.display([0x20, 0, 0, 0])
+    board.display([0x60, 0, 0, 0])
     board.call('test_power_down')
     board.display([0, 0, 0, 0])
     assert board.state() == (0, 2, 2), 'power-down changed mode memory'
@@ -157,11 +158,105 @@ def test_physical_keys_inhibited_by_trigger(image):
     assert board.state() == (0, 2, 1)
 
 
+def test_physical_reverse_k3_led5_and_direction_memory(image):
+    """验证反转K3情景单灯、双调速交接，以及涉及情景时保留原方向记忆。"""
+    board = ModeBoard(image)
+    board.call('test_mode_direction', 1)
+    assert board.state() == (0, 1, 4)
+    board.display([0x40, 0, 0, 0])
+    board.press(0x47)
+    assert board.state() == (0, 2, 4)
+    board.display([0x60, 0, 0, 0])
+    board.press(0x46)
+    assert board.state() == (1, 2, 4), 'reverse K3 did not select fixed scene4'
+    board.display([0, 0x08, 0, 0])
+    board.key_ms(0x46, 200)
+    assert board.state() == (1, 2, 4), 'held reverse K3 repeated the toggle'
+    board.press(0x46)
+    assert board.state() == (0, 2, 4), 'reverse K3 did not restore remembered speed2'
+    board.display([0x60, 0, 0, 0])
+    board.press(0x46)
+    assert board.state() == (1, 2, 4)
+    board.display([0, 0x08, 0, 0])
+    board.press(0x47)
+    assert board.state() == (0, 2, 4), 'reverse K2 changed remembered gear when leaving scene'
+    board.call('test_mode_direction', 0)
+    assert board.state() == (0, 2, 1), 'forward speed did not inherit the leaving reverse gear'
+    board.display([0x60, 0, 0, 0])
+    board.press(0x46)
+    board.press(0x46)
+    assert board.state() == (1, 2, 2)
+    board.display([0, 0x20, 0, 0])
+    board.call('test_mode_direction', 1)
+    assert board.state() == (0, 2, 4), 'reverse remembered speed2 was lost'
+    board.press(0x46)
+    board.display([0, 0x08, 0, 0])
+    board.call('test_trigger', 1)
+    board.key_ms(0x46, 100)
+    assert board.state() == (1, 2, 4), 'reverse K3 toggled while trigger pressed'
+    board.call('test_trigger', 0)
+    board.key_ms(0x46, 100)
+    assert board.state() == (1, 2, 4), 'held reverse K3 replayed after trigger release'
+    board.press(0x46)
+    assert board.state() == (0, 2, 4)
+    board.display([0x60, 0, 0, 0])
+    board.call('test_mode_direction', 0)
+    assert board.state() == (1, 2, 2), 'forward scene2 was lost after reverse toggles'
+    board.display([0, 0x20, 0, 0])
+
+
+def test_physical_speed_direction_handoff_and_scene_memory(image):
+    """验证双调速往返沿用当前档位，任一方向为情景时各自保留档位和单灯。"""
+    board = ModeBoard(image)
+    board.press(0x47)
+    board.press(0x47)
+    assert board.state() == (0, 3, 1)
+    board.display([0x70, 0, 0, 0])
+    board.call('test_mode_direction', 1)
+    assert board.state() == (0, 3, 4), 'reverse speed did not inherit forward speed3'
+    board.display([0x70, 0, 0, 0])
+    board.press(0x47)
+    assert board.state() == (0, 4, 4)
+    board.display([0x78, 0, 0, 0])
+    board.call('test_mode_direction', 0)
+    assert board.state() == (0, 4, 1), 'forward speed did not inherit reverse speed4'
+    board.display([0x78, 0, 0, 0])
+    board.press(0x46)
+    board.press(0x46)
+    assert board.state() == (1, 4, 2)
+    board.display([0, 0x20, 0, 0])
+    board.call('test_mode_direction', 1)
+    board.press(0x47)
+    assert board.state() == (0, 1, 4)
+    board.display([0x40, 0, 0, 0])
+    board.call('test_mode_direction', 0)
+    assert board.state() == (1, 4, 2), 'speed-to-scene switch overwrote forward speed4 or scene2'
+    board.display([0, 0x20, 0, 0])
+    board.call('test_mode_direction', 1)
+    assert board.state() == (0, 1, 4), 'scene-to-speed switch overwrote reverse speed1'
+    board.display([0x40, 0, 0, 0])
+    board.press(0x46)
+    assert board.state() == (1, 1, 4)
+    board.display([0, 0x08, 0, 0])
+    board.call('test_mode_direction', 0)
+    assert board.state() == (1, 4, 2), 'scene-to-scene switch overwrote forward memory'
+    board.display([0, 0x20, 0, 0])
+    board.press(0x47)
+    assert board.state() == (0, 4, 2)
+    board.display([0x78, 0, 0, 0])
+    board.call('test_mode_direction', 1)
+    assert board.state() == (1, 1, 4), 'speed-to-reverse-scene switch overwrote reverse memory'
+    board.display([0, 0x08, 0, 0])
+
+
 def main():
+    """编译真实模式显示代码并运行五组总线级行为回归。"""
     image = build()
     failures = []
     for test in [test_physical_k3_to_scene_display, test_physical_k2_speed_order_and_mode_memory,
-                 test_physical_keys_inhibited_by_trigger]:
+                 test_physical_keys_inhibited_by_trigger,
+                 test_physical_reverse_k3_led5_and_direction_memory,
+                 test_physical_speed_direction_handoff_and_scene_memory]:
         try:
             test(image)
             print(f'PASS: {test.__name__}')

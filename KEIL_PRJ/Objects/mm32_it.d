@@ -34,4 +34,5 @@
   ..\USER\inc\parameter.h ..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h \
   ..\USER\inc\user_control.h ..\MC_CORE\mc_core.h \
   ..\MOTOR_CONTROL\motor_control.h ..\USER\inc\led.h \
-  ..\USER\inc\Bat_com.h ..\MOTOR_CONTROL\motor_config.h
+  ..\USER\inc\Bat_com.h ..\USER\inc\tool_mode.h \
+  ..\MOTOR_CONTROL\motor_config.h

@@ -111,12 +111,19 @@ static void test_swd_startup_not_remapped_early(void)
 	CHECK((GPIOB->CRH&0xf)==0);
 }
 
+/** @brief 验证真实方向门控只在方向提交时恢复对应记忆，运行或制动期间仍保留原方向。 */
 static void test_direction_and_key(void)
 {
 	unsigned i;
 	memset(&user_list, 0, sizeof(user_list));
 	memset(&mc_core_list, 0, sizeof(mc_core_list));
 	memset(&motor_control_list, 0, sizeof(motor_control_list));
+	tool_mode_init();
+	tool_mode_list.setting[TOOL_DIRECTION_FORWARD].mode=TOOL_MODE_SCENE;
+	tool_mode_list.setting[TOOL_DIRECTION_FORWARD].speed_gear=3;
+	tool_mode_list.setting[TOOL_DIRECTION_FORWARD].scene_gear=2;
+	tool_mode_list.setting[TOOL_DIRECTION_REVERSE].mode=TOOL_MODE_SCENE;
+	tool_mode_list.setting[TOOL_DIRECTION_REVERSE].speed_gear=4;
 	motor_control_list.bldc_state=MOTOR_STOP;
 	user_list.flag.bits.gToolTrigger=1;
 	user_direction_handle();
@@ -127,6 +134,7 @@ static void test_direction_and_key(void)
 	for(i=0;i<12;i++) user_direction_handle();
 	/* 正常按扳机上电：首次方向稳定后不应要求松手重扣。 */
 	CHECK(user_list.direction_ready && user_list.dir_valid && !user_list.dir_retrig_need);
+	CHECK(tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD && tool_mode_gear()==2);
 	user_list.flag.bits.gToolTrigger=0;
 	user_direction_handle();
 	CHECK(user_list.direction_ready && user_list.dir_valid && mc_core_list.mc_dir==0);
@@ -136,18 +144,26 @@ static void test_direction_and_key(void)
 	user_list.Dir_Data=1;
 	for(i=0;i<12;i++) user_direction_handle();
 	CHECK(!user_list.dir_valid && user_list.dir_retrig_need && mc_core_list.mc_dir==0);
+	CHECK(tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD && tool_mode_gear()==2);
 	motor_control_list.bldc_state=MOTOR_HBRAKE;
 	user_list.flag.bits.gToolTrigger=0;
 	user_direction_handle();
 	CHECK(mc_core_list.mc_dir==0 && !user_list.direction_ready);
+	CHECK(tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD && tool_mode_current()->speed_gear==3);
 	motor_control_list.bldc_state=MOTOR_STOP;
 	mc_core_list.motor_en=0;
 	user_list.flag.bits.gToolTrigger=1;
 	user_direction_handle();
 	CHECK(mc_core_list.mc_dir==0 && !user_list.direction_ready);
 	user_list.flag.bits.gToolTrigger=0;
+	user_list.flag.bits.gToolEn=1;
+	user_direction_handle();
+	CHECK(mc_core_list.mc_dir==0 && tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD);
+	user_list.flag.bits.gToolEn=0;
 	user_direction_handle();
 	CHECK(mc_core_list.mc_dir==1 && user_list.direction_ready);
+	CHECK(tool_mode_list.active_direction==TOOL_DIRECTION_REVERSE && tool_mode_gear()==4);
+	CHECK(tool_mode_current()->speed_gear==4 && !tool_mode_list.save_pending);
 	user_list.Key_Data=0;
 	for(i=0;i<60;i++) CHECK(key_scan()==0);
 	user_list.Key_Data=1;
@@ -365,12 +381,13 @@ static void test_fault_hold_and_release_sleep(void)
 	CHECK(!(EN_PORT->ODR & EN_PIN));
 }
 
+/** @brief 验证调速累计四灯、正转情景单灯及反转情景LED5，并保持NTC保护回归。 */
 static void test_mode_led_and_ntc(void)
 {
 	unsigned i;
-	/* 实板调速：DIG1绿色，LED8/G到LED5/D；情景LED8/G、LED6/E、LED5/D。 */
-	const uint8_t speed_masks[]={0x40,0x20,0x10,0x08};
-	const uint8_t scene_masks[]={0x40,0x10,0x08};
+	/* 实板调速从LED8/G累计亮到LED5/D；正转情景仍单亮LED8/G、LED7/F、LED6/E。 */
+	const uint8_t speed_masks[]={0x40,0x60,0x70,0x78};
+	const uint8_t scene_masks[]={0x40,0x20,0x10};
 	memset(&user_list,0,sizeof(user_list));
 	memset(&machine_error_hold,0,sizeof(machine_error_hold));
 	user_list.user_state=TOOL_STOP;
@@ -378,19 +395,30 @@ static void test_mode_led_and_ntc(void)
 	tool_mode_init();
 	for(i=0;i<4;i++)
 	{
-		tool_mode_list.speed_gear=i+1;
+		tool_mode_current()->speed_gear=i+1;
 		UO_Led_Handler();
 		CHECK(TM1650_GetDigit(0)==speed_masks[i] && TM1650_GetDigit(1)==0);
 		CHECK(TM1650_GetDigit(2)==0 && TM1650_GetDigit(3)==0);
 	}
-	tool_mode_list.mode=TOOL_MODE_SCENE;
+	tool_mode_current()->mode=TOOL_MODE_SCENE;
 	for(i=0;i<3;i++)
 	{
-		tool_mode_list.scene_gear=i+1;
+		tool_mode_current()->scene_gear=i+1;
 		UO_Led_Handler();
 		CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==scene_masks[i]);
 		CHECK(TM1650_GetDigit(2)==0 && TM1650_GetDigit(3)==0);
 	}
+	tool_mode_set_direction(TOOL_DIRECTION_REVERSE);
+	tool_mode_key_event(TOOL_MODE_KEY_SCENE);
+	UO_Led_Handler();
+	CHECK(tool_mode_gear()==4 && TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0x08);
+	CHECK(TM1650_GetDigit(2)==0 && TM1650_GetDigit(3)==0);
+	tool_mode_key_event(TOOL_MODE_KEY_SCENE);
+	UO_Led_Handler();
+	CHECK(tool_mode_current()->mode==TOOL_MODE_SPEED && TM1650_GetDigit(0)==0x40 && TM1650_GetDigit(1)==0);
+	tool_mode_set_direction(TOOL_DIRECTION_FORWARD);
+	UO_Led_Handler();
+	CHECK(tool_mode_gear()==3 && TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0x10);
 	user_list.user_state=TOOL_POWER_DOWN;
 	UO_Led_Handler();
 	CHECK(TM1650_GetDigit(0)==0 && TM1650_GetDigit(1)==0 && ledData.Word==0);
@@ -405,6 +433,53 @@ static void test_mode_led_and_ntc(void)
 	CHECK(!user_list.userErr.bits.gNtcMos);
 }
 
+/** @brief 验证真实方向门控在双调速间交接当前档位，待停转并松扳机提交后灯显连续。 */
+static void test_direction_speed_led_handoff(void)
+{
+	unsigned i;
+	memset(&user_list,0,sizeof(user_list));
+	memset(&machine_error_hold,0,sizeof(machine_error_hold));
+	memset(&mc_core_list,0,sizeof(mc_core_list));
+	memset(&motor_control_list,0,sizeof(motor_control_list));
+	tool_mode_init();
+	user_list.user_state=TOOL_STOP;
+	user_list.VBus_Vx100=2100;
+	user_list.led_input_valid=1;
+	user_list.Dir_Data=0;
+	motor_control_list.bldc_state=MOTOR_STOP;
+	for(i=0;i<12;i++) user_direction_handle();
+	CHECK(user_list.direction_ready && tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD);
+	tool_mode_current()->speed_gear=3;
+	CHECK(tool_mode_list.setting[TOOL_DIRECTION_REVERSE].speed_gear==1);
+	UO_Led_Handler();
+	CHECK(TM1650_GetDigit(0)==0x70 && TM1650_GetDigit(1)==0);
+	user_list.flag.bits.gToolTrigger=1;
+	motor_control_list.bldc_state=MOTOR_RUN;
+	mc_core_list.motor_en=1;
+	user_list.Dir_Data=1;
+	for(i=0;i<12;i++) user_direction_handle();
+	UO_Led_Handler();
+	CHECK(tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD && tool_mode_gear()==3);
+	CHECK(tool_mode_list.setting[TOOL_DIRECTION_REVERSE].speed_gear==1);
+	CHECK(TM1650_GetDigit(0)==0x70 && TM1650_GetDigit(1)==0);
+	user_list.flag.bits.gToolTrigger=0;
+	motor_control_list.bldc_state=MOTOR_STOP;
+	mc_core_list.motor_en=0;
+	user_direction_handle();
+	UO_Led_Handler();
+	CHECK(user_list.direction_ready && tool_mode_list.active_direction==TOOL_DIRECTION_REVERSE);
+	CHECK(tool_mode_gear()==3 && TM1650_GetDigit(0)==0x70 && TM1650_GetDigit(1)==0);
+	tool_mode_key_event(TOOL_MODE_KEY_SPEED);
+	UO_Led_Handler();
+	CHECK(tool_mode_gear()==4 && TM1650_GetDigit(0)==0x78 && TM1650_GetDigit(1)==0);
+	user_list.Dir_Data=0;
+	for(i=0;i<12;i++) user_direction_handle();
+	UO_Led_Handler();
+	CHECK(user_list.direction_ready && tool_mode_list.active_direction==TOOL_DIRECTION_FORWARD);
+	CHECK(tool_mode_gear()==4 && TM1650_GetDigit(0)==0x78 && TM1650_GetDigit(1)==0);
+}
+
+/** @brief 按独立场景运行灯显、保护、方向门控及调速换向交接回归。 */
 uint32_t run_tests(void)
 {
 	tool_mode_init();
@@ -447,5 +522,8 @@ uint32_t run_tests(void)
 	if(test_failure_line) return test_failure_line;
 	test_case=8;
 	test_swd_startup_not_remapped_early();
+	if(test_failure_line) return test_failure_line;
+	test_case=9;
+	test_direction_speed_led_handoff();
 	return test_failure_line;
 }

@@ -85,7 +85,7 @@ void LED_Scan(void)
 
 /**
  * @brief 每1ms更新电量/故障显示和当前挡位灯；电量显示5s，模式灯保持至休眠。
- *        各挡灯号读取parameter.h，DIG1为调速绿色，DIG2为情景红色。
+ *        灯号读取parameter.h，调速绿色灯从1档累加到当前档，情景红色保持单灯。
  */
 void UO_Led_Handler(void)
 {
@@ -97,8 +97,10 @@ void UO_Led_Handler(void)
 		TOOL_SCENE_GEAR1_LED, TOOL_SCENE_GEAR2_LED, TOOL_SCENE_GEAR3_LED
 	};
 	uint8_t gear=tool_mode_gear();
+	tool_mode_setting_t *setting=tool_mode_current();
 	uint8_t led_number;
-	uint8_t mask;
+	uint8_t mask=0;
+	uint8_t i;
 	uint8_t trigger=user_list.flag.bits.gToolTrigger;
 	uint8_t battery_display_en;
 	/* 只有松开后重新扣动才重启5s；长按及松手不清零电量计时。 */
@@ -128,19 +130,29 @@ void UO_Led_Handler(void)
 	/* 计数到5s饱和，避免长时间扣住后溢出重新点亮；模式灯保持到休眠。 */
 	if(battery_display_ms<BATTERY_LED_TIME) battery_display_ms++;
 	/* LED5/6/7/8对应D/E/F/G，即显存bit3/4/5/6；宏中直接填写灯编号。 */
-	if(tool_mode_list.mode==TOOL_MODE_SCENE)
+	if(setting->mode==TOOL_MODE_SCENE)
 	{
-		if(gear<1 || gear>3) gear=1;
-		led_number=scene_led[gear-1];
+		if(tool_mode_list.active_direction==TOOL_DIRECTION_REVERSE)
+		{
+			led_number=TOOL_REVERSE_SCENE_GEAR4_LED;
+		}
+		else
+		{
+			if(gear<1 || gear>3) gear=1;
+			led_number=scene_led[gear-1];
+		}
+		mask=(uint8_t)(1u<<(led_number-2u));
 	}
 	else
 	{
 		if(gear<1 || gear>4) gear=1;
-		led_number=speed_led[gear-1];
+		for(i=0;i<gear;i++)
+		{
+			mask|=(uint8_t)(1u<<(speed_led[i]-2u));
+		}
 	}
-	mask=(uint8_t)(1u<<(led_number-2u));
-	TM1650_SetDigit(0, tool_mode_list.mode==TOOL_MODE_SPEED ? mask : 0);
-	TM1650_SetDigit(1, tool_mode_list.mode==TOOL_MODE_SCENE ? mask : 0);
+	TM1650_SetDigit(0, setting->mode==TOOL_MODE_SPEED ? mask : 0);
+	TM1650_SetDigit(1, setting->mode==TOOL_MODE_SCENE ? mask : 0);
 	TM1650_SetDigit(2, 0);
 	TM1650_SetDigit(3, 0);
 }
