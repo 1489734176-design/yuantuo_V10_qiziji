@@ -55,7 +55,7 @@
  * 原多级峰值过流仍独立生效；其30A/50ms保护可能先于情景3挡到位判据停机。 */
 #define TOOL_SCENE_GEAR2_STOP_CURRENT            (20.0f) // 情景2挡到位峰值电流，单位A
 #define TOOL_SCENE_GEAR2_STOP_CURRENT_AdcValue   (u16)(TOOL_SCENE_GEAR2_STOP_CURRENT*CURRENT_ADC_PER_A)
-#define TOOL_SCENE_GEAR2_STOP_MS                 (80) // 连续超限确认时间，单位ms
+#define TOOL_SCENE_GEAR2_STOP_MS                 (50) // 连续超限确认时间，单位ms
 #define TOOL_SCENE_GEAR2_STOP_MS_CONUT           (u16)((float)TOOL_SCENE_GEAR2_STOP_MS*SLOWLOOP_FRE/1000.0f)
 
 #define TOOL_SCENE_GEAR3_STOP_CURRENT            (25.0f) // 情景3挡到位峰值电流，单位A

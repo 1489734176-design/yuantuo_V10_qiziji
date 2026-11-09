@@ -1755,6 +1755,7 @@ void user_screw_seat_stop_handle(void)
 	   user_list.flag.bits.gAutoStop || user_list.userErr.word || mc_core_list.MC_error.word ||
 	   machine_error_hold.userErr_hold.word || machine_error_hold.MC_error_hold.word)
 	{
+		user_list.CW_Auto_Mask_count = 0;
 		seat_stop_count=0;
 		seat_stop_gear=0;
 		return;
@@ -1777,26 +1778,39 @@ void user_screw_seat_stop_handle(void)
 		confirm_count=TOOL_SCENE_GEAR3_STOP_MS_CONUT;
 	}
 
-	/* IBusPeak_Adc已经过零偏扣除和VCC校准，门限使用相同的ADC单位。
-	 * 严格大于才计数；等于或低于门限立即清零，保证连续超限而非累计积分。 */
-	if(user_list.IBusPeak_Adc>current_limit)
+	/* 累计本轮运行时间，并限制最大值，避免16位计数器回绕后重新进入启动屏蔽期。 */
+	if(user_list.CW_Auto_Mask_count<63334)
 	{
-		if(seat_stop_count<confirm_count) 
+		user_list.CW_Auto_Mask_count++;
+	}
+	/* 计数大于150后才允许卸载判断，启动屏蔽期间不累计低电流次数。 */
+	if(user_list.CW_Auto_Mask_count>CCW_AUTO_STOP_START_MASK_COUNT)
+	{		
+		/* IBusPeak_Adc已经过零偏扣除和VCC校准，门限使用相同的ADC单位。
+		 * 严格大于才计数；等于或低于门限立即清零，保证连续超限而非累计积分。 */
+		if(user_list.IBusPeak_Adc>current_limit)
 		{
-			seat_stop_count++;
+			if(seat_stop_count<confirm_count) 
+			{
+				seat_stop_count++;
+			}
+			/* 先加后判：默认1000Hz下，第100份连续超限样本触发，不多等一拍。 */
+			if(seat_stop_count>=confirm_count)
+			{
+				user_list.flag.bits.gAutoStop=1;
+			}
 		}
-		/* 先加后判：默认1000Hz下，第100份连续超限样本触发，不多等一拍。 */
-		if(seat_stop_count>=confirm_count)
+		else
 		{
-			user_list.flag.bits.gAutoStop=1;
+			if(seat_stop_count)
+			{
+				seat_stop_count--;
+			}
 		}
 	}
 	else
 	{
-		if(seat_stop_count)
-		{
-			seat_stop_count--;
-		}
+		seat_stop_count = 0;
 	}
 }
 

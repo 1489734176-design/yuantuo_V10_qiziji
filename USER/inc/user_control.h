@@ -95,6 +95,7 @@ typedef struct
 	uint8_t 	gears_ccw_level; // 反转挡位等级
 	uint32_t 	sleep_cnt;     // 休眠计数
 	uint16_t 	CCW_Auto_Mask_count; // 反转自动停机屏蔽计数
+	uint16_t 	CW_Auto_Mask_count; // 反转自动停机屏蔽计数
 	UC_Flag_u	flag;          // 工具标志位   
 	uint8_t		En_pin_dir;    // 使能引脚方向
 	uint8_t		led_reuse_adc_flag; // LED复用ADC标志

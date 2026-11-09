@@ -48,9 +48,9 @@ I (..\DRIVE\inc\drv_pwm.h)(0x6A9E8A87)
 I (..\DRIVE\inc\drv_led.h)(0x6A9E8A87)
 I (..\DRIVE\inc\drv_div.h)(0x6A9E8A87)
 I (..\USER\inc\mm32_it.h)(0x6AAB9140)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 I (..\MOTOR_CONTROL\motor_control.h)(0x6A9E8A28)
 I (..\USER\inc\flash_data_save.h)(0x6AEC3184)
@@ -106,7 +106,7 @@ I (..\DRIVE\inc\drv_iwdg.h)(0x6A9E8A87)
 I (..\DRIVE\inc\drv_div.h)(0x6A9E8A87)
 I (..\USER\inc\mm32_it.h)(0x6AAB9140)
 I (..\USER\inc\main.h)(0x6A9E91E3)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 I (..\USER\inc\led.h)(0x6AED49E8)
 I (..\USER\inc\Bat_com.h)(0x6AE97FB0)
@@ -158,18 +158,18 @@ I (..\DRIVE\inc\drv_iwdg.h)(0x6A9E8A87)
 I (..\DRIVE\inc\drv_div.h)(0x6A9E8A87)
 I (..\USER\inc\mm32_it.h)(0x6AAB9140)
 I (..\USER\inc\main.h)(0x6A9E91E3)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
 I (..\MOTOR_CONTROL\motor_control.h)(0x6A9E8A28)
 I (..\USER\inc\led.h)(0x6AED49E8)
 I (..\USER\inc\Bat_com.h)(0x6AE97FB0)
 I (..\USER\inc\tool_mode.h)(0x6AED49E8)
 I (..\MOTOR_CONTROL\motor_config.h)(0x6AEC1406)
-F (..\USER\inc\parameter.h)(0x6AEDA3DD)()
-F (..\USER\user_control.c)(0x6AED8E69)(-xc -std=c90 --target=arm-arm-none-eabi -mcpu=cortex-m0 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__MICROLIB -gdwarf-4 -O1 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../MM32SPIN0230/Include -I ../MM32SPIN0230/HAL_Lib/inc -I ../DRIVE/inc -I ../SYSTEM/inc -I ../USER/inc -I ../M1_CONTROL/inc -I ../MM_MCLIB/inc -I ../MM_MCLIB/inc -I ../MY_MC -I ../MOTOR_CONTROL -I ../MC_CORE -I ../TM1650-I./RTE/_MM32SPIN0230-ID:/Users/mym02/AppData/Local/Arm/Packs/ARM/CMSIS/5.9.0/CMSIS/Core/Include-D__UVISION_VERSION="541" -D_RTE_ -DUSE_STDPERIPH_DRIVER -DUSE_5V-o ./objects/user_control.o -MMD)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+F (..\USER\inc\parameter.h)(0x6AEDA8F2)()
+F (..\USER\user_control.c)(0x6AEDA8F2)(-xc -std=c90 --target=arm-arm-none-eabi -mcpu=cortex-m0 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__MICROLIB -gdwarf-4 -O1 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../MM32SPIN0230/Include -I ../MM32SPIN0230/HAL_Lib/inc -I ../DRIVE/inc -I ../SYSTEM/inc -I ../USER/inc -I ../M1_CONTROL/inc -I ../MM_MCLIB/inc -I ../MM_MCLIB/inc -I ../MY_MC -I ../MOTOR_CONTROL -I ../MC_CORE -I ../TM1650-I./RTE/_MM32SPIN0230-ID:/Users/mym02/AppData/Local/Arm/Packs/ARM/CMSIS/5.9.0/CMSIS/Core/Include-D__UVISION_VERSION="541" -D_RTE_ -DUSE_STDPERIPH_DRIVER -DUSE_5V-o ./objects/user_control.o -MMD)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\Include\mm32spin0230.h)(0x6A3A7418)
 I (D:\Users\mym02\AppData\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include\core_cm0.h)(0x6A994285)
 I (..\MM32SPIN0230\Include\reg_adc.h)(0x6A3A7418)
@@ -207,7 +207,7 @@ I (..\MM32SPIN0230\HAL_Lib\inc\hal_tim.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h)(0x6A3A7418)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 I (..\USER\inc\board.h)(0x6AEB06C4)
 I (..\MOTOR_CONTROL\motor_control.h)(0x6A9E8A28)
@@ -258,9 +258,9 @@ I (..\MM32SPIN0230\HAL_Lib\inc\hal_tim.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h)(0x6A3A7418)
 I (..\USER\inc\led.h)(0x6AED49E8)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 I (..\USER\inc\tool_mode.h)(0x6AED49E8)
 I (..\TM1650\tm1650.h)(0x6AEB04DF)
@@ -302,12 +302,12 @@ I (..\MM32SPIN0230\HAL_Lib\inc\hal_syscfg.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_tim.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h)(0x6A3A7418)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
 I (..\USER\inc\tool_mode.h)(0x6AED49E8)
 F (..\USER\tool_mode.c)(0x6AED572E)(-xc -std=c90 --target=arm-arm-none-eabi -mcpu=cortex-m0 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__MICROLIB -gdwarf-4 -O1 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../MM32SPIN0230/Include -I ../MM32SPIN0230/HAL_Lib/inc -I ../DRIVE/inc -I ../SYSTEM/inc -I ../USER/inc -I ../M1_CONTROL/inc -I ../MM_MCLIB/inc -I ../MM_MCLIB/inc -I ../MY_MC -I ../MOTOR_CONTROL -I ../MC_CORE -I ../TM1650-I./RTE/_MM32SPIN0230-ID:/Users/mym02/AppData/Local/Arm/Packs/ARM/CMSIS/5.9.0/CMSIS/Core/Include-D__UVISION_VERSION="541" -D_RTE_ -DUSE_STDPERIPH_DRIVER -DUSE_5V-o ./objects/tool_mode.o -MMD)
 I (..\USER\inc\tool_mode.h)(0x6AED49E8)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 I (..\MM32SPIN0230\Include\mm32_device.h)(0x6A3A7418)
 I (..\MM32SPIN0230\Include\mm32spin0230.h)(0x6A3A7418)
@@ -345,7 +345,7 @@ I (..\MM32SPIN0230\HAL_Lib\inc\hal_syscfg.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_tim.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h)(0x6A3A7418)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
 I (..\MOTOR_CONTROL\motor_control.h)(0x6A9E8A28)
 I (..\USER\inc\flash_data_save.h)(0x6AEC3184)
@@ -428,10 +428,10 @@ I (..\MM32SPIN0230\HAL_Lib\inc\hal_tim.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h)(0x6A3A7418)
 I (..\USER\inc\Bat_com.h)(0x6AE97FB0)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
 I (..\MOTOR_CONTROL\motor_control.h)(0x6A9E8A28)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 F (..\SYSTEM\systick.c)(0x6A9E8AD3)(-xc -std=c90 --target=arm-arm-none-eabi -mcpu=cortex-m0 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__MICROLIB -gdwarf-4 -O1 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../MM32SPIN0230/Include -I ../MM32SPIN0230/HAL_Lib/inc -I ../DRIVE/inc -I ../SYSTEM/inc -I ../USER/inc -I ../M1_CONTROL/inc -I ../MM_MCLIB/inc -I ../MM_MCLIB/inc -I ../MY_MC -I ../MOTOR_CONTROL -I ../MC_CORE -I ../TM1650-I./RTE/_MM32SPIN0230-ID:/Users/mym02/AppData/Local/Arm/Packs/ARM/CMSIS/5.9.0/CMSIS/Core/Include-D__UVISION_VERSION="541" -D_RTE_ -DUSE_STDPERIPH_DRIVER -DUSE_5V-o ./objects/systick.o -MMD)
 I (..\SYSTEM\inc\systick.h)(0x6A9E8B00)
@@ -739,7 +739,7 @@ I (..\MM32SPIN0230\HAL_Lib\inc\hal_tim.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h)(0x6A3A7418)
 I (..\DRIVE\inc\drv_pwm.h)(0x6A9E8A87)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 F (..\MM32SPIN0230\HAL_Lib\src\hal_adc.c)(0x6A3A7418)(-xc -std=c90 --target=arm-arm-none-eabi -mcpu=cortex-m0 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__MICROLIB -gdwarf-4 -O1 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../MM32SPIN0230/Include -I ../MM32SPIN0230/HAL_Lib/inc -I ../DRIVE/inc -I ../SYSTEM/inc -I ../USER/inc -I ../M1_CONTROL/inc -I ../MM_MCLIB/inc -I ../MM_MCLIB/inc -I ../MY_MC -I ../MOTOR_CONTROL -I ../MC_CORE -I ../TM1650-I./RTE/_MM32SPIN0230-ID:/Users/mym02/AppData/Local/Arm/Packs/ARM/CMSIS/5.9.0/CMSIS/Core/Include-D__UVISION_VERSION="541" -D_RTE_ -DUSE_STDPERIPH_DRIVER -DUSE_5V-o ./objects/hal_adc.o -MMD)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_adc.h)(0x6A3A7418)
@@ -1448,11 +1448,11 @@ I (..\MM32SPIN0230\HAL_Lib\inc\hal_usart.h)(0x6A3A7418)
 I (..\MM32SPIN0230\HAL_Lib\inc\hal_uid.h)(0x6A3A7418)
 I (..\MC_CORE\mc_core.h)(0x6A9E8B60)
 I (..\DRIVE\inc\drv_pwm.h)(0x6A9E8A87)
-I (..\USER\inc\parameter.h)(0x6AEDA3DD)
+I (..\USER\inc\parameter.h)(0x6AEDA8F2)
 I (..\MM32SPIN0230\HAL_Lib\inc\HAL_device.h)(0x6A3A7418)
 I (..\USER\inc\board.h)(0x6AEB06C4)
 I (..\DRIVE\inc\drv_adc.h)(0x6A9E8A87)
-I (..\USER\inc\user_control.h)(0x6AED87A0)
+I (..\USER\inc\user_control.h)(0x6AEDA8F2)
 I (..\SYSTEM\inc\systick.h)(0x6A9E8B00)
 I (..\MOTOR_CONTROL\motor_config.h)(0x6AEC1406)
 I (..\USER\inc\tool_mode.h)(0x6AED49E8)
