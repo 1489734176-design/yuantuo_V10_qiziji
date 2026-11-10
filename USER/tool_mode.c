@@ -20,6 +20,9 @@ static uint8_t scene_load_boost;
 static uint8_t scene_load_pending;
 static uint32_t scene_load_run_start;
 static uint32_t scene_load_confirm_start;
+static uint8_t scene_gear3_limited; // 情景3挡本次扣动电流连续超限确认后的降速锁存
+static uint8_t scene_gear3_pending;
+static uint32_t scene_gear3_confirm_start;
 
 #define REVERSE_SCENE_RAMP (0u)
 #define REVERSE_SCENE_HOLD (1u)
@@ -38,7 +41,18 @@ static void tool_mode_scene_load_reset(void)
 }
 
 /**
- * @brief 初始化正反转独立模式、挡位、情景曲线及负载状态，上电默认不写Flash。
+ * @brief 清除正转情景3挡本次扣动的降速锁存和连续超限消抖计时。
+ */
+static void tool_mode_scene_gear3_reset(void)
+{
+	scene_gear3_limited=0;
+	scene_gear3_pending=0;
+	scene_gear3_confirm_start=0;
+}
+
+/**
+ * @brief 初始化正反转独立模式、挡位、情景曲线及负载状态，清除3挡锁存和消抖。
+ *        上电默认不写Flash。
  */
 void tool_mode_init(void)
 {
@@ -55,6 +69,7 @@ void tool_mode_init(void)
 	reverse_scene_full_start=0;
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
 	tool_mode_scene_load_reset();
+	tool_mode_scene_gear3_reset();
 	key_poll_count=0;
 	key_candidate=0;
 	key_stable_count=0;
@@ -72,13 +87,14 @@ tool_mode_setting_t *tool_mode_current(void)
 }
 
 /**
- * @brief 恢复开关所在方向的记忆，同步档位并清除反转曲线及正转负载升速进度。
+ * @brief 恢复开关所在方向的记忆，同步档位并清除情景曲线、升速及3挡锁存和消抖。
  */
 void tool_mode_restore_direction(uint8_t reverse)
 {
 	tool_mode_list.active_direction=reverse ? TOOL_DIRECTION_REVERSE : TOOL_DIRECTION_FORWARD;
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
 	tool_mode_scene_load_reset();
+	tool_mode_scene_gear3_reset();
 	user_list.gears_level=tool_mode_gear()-1;
 }
 
@@ -123,7 +139,7 @@ uint8_t tool_mode_gear(void)
 
 /**
  * @brief 处理一次有效按压，反转情景键只切模式，正转按键与调速升挡保持原逻辑。
- *        有效切换后清除本次运行的情景曲线和负载升速进度。
+ *        有效切换后清除本次运行的情景曲线、负载升速进度及3挡锁存和消抖。
  * @param key K2调速键或K3情景键的TM1650键码。
  */
 void tool_mode_key_event(uint8_t key)
@@ -166,6 +182,7 @@ void tool_mode_key_event(uint8_t key)
 	/* 旧用户结构保留0起始挡位索引，持久化使用新模块的1起始挡位。 */
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
 	tool_mode_scene_load_reset();
+	tool_mode_scene_gear3_reset();
 	user_list.gears_level=tool_mode_gear()-1;
 	tool_mode_list.save_pending=1;
 	user_list.sleep_cnt=0;
@@ -339,8 +356,55 @@ static uint16_t tool_mode_scene_load_duty(void)
 }
 
 /**
+ * @brief 正转情景3挡电源平均电流连续大于门限满消抖时间后锁存低占空比。
+ *        仅有效运行及AVG校准时计时；确认前电流回落或许可失效均重新计时。
+ *        确认降速后保持锁存，松扳机才恢复正常目标。
+ */
+static uint16_t tool_mode_scene_gear3_duty(void)
+{
+	uint16_t normal=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*TOOL_SCENE_GEAR3_DUTY_PERCENT)/100u);
+	uint16_t limited=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*TOOL_SCENE_GEAR3_LIMIT_DUTY_PERCENT)/100u);
+	uint32_t now;
+	/* 采用已有扳机释放去抖结果，下一次扣动从本挡正常占空比重新开始。 */
+	if(!user_list.flag.bits.gToolTrigger)
+	{
+		tool_mode_scene_gear3_reset();
+		return normal;
+	}
+	/* 已完成消抖的降速不因电流回落或许可撤销而解除，停机仍由原保护处理。 */
+	if(scene_gear3_limited) return limited;
+	/* 必须严格大于门限且运行条件有效；等于/低于门限或保护打断就从头消抖。 */
+	if(!user_list.flag.bits.gToolEn || !mc_core_list.motor_en ||
+	   user_list.user_state!=TOOL_RUN || motor_control_list.bldc_state!=MOTOR_RUN ||
+	   !user_list.IBusAvgOffsetValid || user_list.flag.bits.gAutoStop ||
+	   user_list.userErr.word || mc_core_list.MC_error.word ||
+	   machine_error_hold.userErr_hold.word || machine_error_hold.MC_error_hold.word ||
+	   user_list.IBusAvgScene_Adc<=TOOL_SCENE_GEAR3_LIMIT_CURRENT_AdcValue)
+	{
+		scene_gear3_pending=0;
+		scene_gear3_confirm_start=0;
+		return normal;
+	}
+	/* 用1ms中断时钟的时间差计满200ms，同一毫秒重复调用不会提前确认。
+	 * 无符号时间差也能正确处理毫秒时钟回绕。 */
+	now=mode_clock_ms;
+	if(!scene_gear3_pending)
+	{
+		scene_gear3_pending=1;
+		scene_gear3_confirm_start=now;
+	}
+	else if((uint32_t)(now-scene_gear3_confirm_start)>=TOOL_SCENE_GEAR3_LIMIT_CONFIRM_MS)
+	{
+		scene_gear3_limited=1;
+		scene_gear3_pending=0;
+	}
+	return scene_gear3_limited ? limited : normal;
+}
+
+/**
  * @brief 按parameter.h中的当前挡百分比生成目标PWM计数。
- *        调速映射扳机，正转情景1挡按负载升降速，反转情景按定时曲线降速。
+ *        调速映射扳机，正转情景1挡按负载升降速，3挡连续超限消抖后锁存低速。
+ *        反转情景按定时曲线降速；离开正转情景3挡时清除本次锁存及消抖。
  * @param trigger_duty 原扳机映射的PWM计数。
  * @return 当前模式及挡位的目标PWM计数，实际输出继续经过软启动和保护。
  */
@@ -362,19 +426,27 @@ uint16_t tool_mode_duty(uint16_t trigger_duty)
 	{
 		if(tool_mode_list.active_direction==TOOL_DIRECTION_REVERSE)
 		{
+			tool_mode_scene_gear3_reset();
 			tool_mode_scene_load_reset();
 			return tool_mode_reverse_scene_duty();
 		}
 		reverse_scene_stage=REVERSE_SCENE_RAMP;
-		/* 正转1挡按负载切换目标，2/3挡仍读取固定目标；均与扣动深度无关。 */
+		/* 正转1挡按负载升速，3挡超限消抖后降速，2挡固定目标；均与扣动深度无关。 */
 		gear=setting->scene_gear;
 		if(gear<1 || gear>3) gear=1;
-		if(gear==1) return tool_mode_scene_load_duty();
+		if(gear==1)
+		{
+			tool_mode_scene_gear3_reset();
+			return tool_mode_scene_load_duty();
+		}
 		tool_mode_scene_load_reset();
+		if(gear==3) return tool_mode_scene_gear3_duty();
+		tool_mode_scene_gear3_reset();
 		return (uint16_t)(((uint32_t)PWM_PRIOD_LOAD*scene_percent[gear-1])/100u);
 	}
 	reverse_scene_stage=REVERSE_SCENE_RAMP;
 	tool_mode_scene_load_reset();
+	tool_mode_scene_gear3_reset();
 	gear=setting->speed_gear;
 	if(gear<1 || gear>4) gear=1;
 	maximum=(uint16_t)(((uint32_t)PWM_PRIOD_LOAD*speed_percent[gear-1])/100u);

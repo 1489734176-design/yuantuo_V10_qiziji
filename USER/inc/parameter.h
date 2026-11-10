@@ -29,7 +29,8 @@
  * 灯号填写原理图LED编号，范围5～8；调速累加1档至当前档的灯，情景仅亮当前档灯。
  * 占空比单位为百分比，范围15～100，最低输出仍受MIN_TOOL_DUTY限制。
  * 调速模式：扳机从最低占空比连续调节到本挡上限。
- * 情景模式：扳机只控制启停，正转1挡按负载升降速，其余按固定目标或定时曲线运行。
+ * 情景模式：扳机只控制启停，正转1挡按负载升降速，3挡连续超限消抖后保持低速。
+ * 正转2挡使用固定目标，反转情景按定时曲线运行。
  * 所有目标仍经过原软启动及保护。
  */
 #define TOOL_SPEED_GEAR1_LED          (8u)  // 调速1挡点亮LED8
@@ -47,7 +48,16 @@
 #define TOOL_SPEED_GEAR4_DUTY_PERCENT (100u) // 调速4挡占空比上限，单位%
 #define TOOL_SCENE_GEAR1_DUTY_PERCENT (18u) // 正转情景1挡空载/卸载后的正常目标，单位%
 #define TOOL_SCENE_GEAR2_DUTY_PERCENT (100u) // 情景2挡固定目标，单位%
-#define TOOL_SCENE_GEAR3_DUTY_PERCENT (100u) // 情景3挡固定目标，单位%
+#define TOOL_SCENE_GEAR3_DUTY_PERCENT (100u) // 情景3挡每次重新扣动扳机的正常目标，单位%
+
+/* 正转情景3挡：电源平均电流连续大于18A满200ms后降到30%，松扳机重按恢复正常目标。
+ * 使用AVG自身零偏及VCC校准后的电流；等于或低于门限立即清除本次消抖计时。
+ * 确认降速后锁存低速目标，不因电流回落恢复高速。
+ * 原过流、到位停机和堵转等保护继续生效，实际PWM沿原下降软坡到达低速目标。 */
+#define TOOL_SCENE_GEAR3_LIMIT_CURRENT          (20.0f) // 降速触发的电源平均电流，单位A
+#define TOOL_SCENE_GEAR3_LIMIT_CURRENT_AdcValue  (u16)(TOOL_SCENE_GEAR3_LIMIT_CURRENT*CURRENT_ADC_PER_A)
+#define TOOL_SCENE_GEAR3_LIMIT_DUTY_PERCENT     (30u)   // 本次扣动锁存的降速目标，单位%
+#define TOOL_SCENE_GEAR3_LIMIT_CONFIRM_MS       (200u)  // 电流连续大于门限的消抖时间，单位ms
 
 
 
@@ -96,6 +106,7 @@
     !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR3_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SPEED_GEAR4_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR1_DUTY_PERCENT) || !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR2_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR3_DUTY_PERCENT) || \
+    !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR3_LIMIT_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_REVERSE_SCENE_FULL_DUTY_PERCENT) || \
     !TOOL_MODE_DUTY_VALID(TOOL_REVERSE_SCENE_LOW_DUTY_PERCENT)
@@ -107,6 +118,12 @@
 #endif
 #if TOOL_SCENE_GEAR1_BOOST_DUTY_PERCENT<TOOL_SCENE_GEAR1_DUTY_PERCENT
 #error "Scene gear 1 requires boost duty >= normal duty."
+#endif
+#if TOOL_SCENE_GEAR3_LIMIT_DUTY_PERCENT>TOOL_SCENE_GEAR3_DUTY_PERCENT
+#error "Scene gear 3 requires limited duty <= normal duty."
+#endif
+#if TOOL_SCENE_GEAR3_LIMIT_CONFIRM_MS<1 || TOOL_SCENE_GEAR3_LIMIT_CONFIRM_MS>60000
+#error "Scene gear 3 requires current confirmation time in 1..60000 ms."
 #endif
 #if TOOL_SCENE_GEAR1_STARTUP_MASK_MS>60000 || \
     TOOL_SCENE_GEAR1_LOAD_ON_MS<1 || TOOL_SCENE_GEAR1_LOAD_ON_MS>60000 || \

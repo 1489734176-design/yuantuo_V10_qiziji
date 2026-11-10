@@ -52,8 +52,20 @@ static uint16_t tick_mode_duty(void)
 	return tool_mode_duty(281);
 }
 
+/** @brief 用实际模式初始化建立3档运行夹具，提供校准后AVG电流而不修改目标算法。 */
+static void prepare_forward_scene3(uint16_t current_adc)
+{
+	prepare_forward_scene1(current_adc);
+	tool_mode_current()->scene_gear=3;
+	user_list.flag.bits.gAutoStop=0;
+	user_list.userErr.word=0;
+	mc_core_list.MC_error.word=0;
+	machine_error_hold.userErr_hold.word=0;
+	machine_error_hold.MC_error_hold.word=0;
+}
+
 /**
- * @brief 验证默认和覆盖参数下，原显示与反转行为及情景1档负载升速配置均生效。
+ * @brief 验证默认和覆盖参数下，显示、反转、情景1档升速与3档电流降速配置均生效。
  *        期望计数按1874周期手算，避免根据被测函数重新生成期望。
  */
 uint32_t run_tests(void)
@@ -69,6 +81,8 @@ uint32_t run_tests(void)
 	/* 1874*82%=1536；8.91891码/A：4.7A向上取42码，2.6A向下取23码。 */
 	const uint16_t scene1_boost=1536,load_on_adc=42,load_off_adc=23;
 	const uint16_t startup_ms=37,load_on_ms=11,load_off_ms=43;
+	/* 27A向下取240码；1874*45%=843，3档正常75%=1405。 */
+	const uint16_t scene3_limit_adc=240,scene3_limit_duty=843,scene3_confirm_ms=73;
 #else
 	const uint8_t speed_masks[]={0x40,0x60,0x70,0x78};
 	const uint8_t scene_masks[]={0x40,0x20,0x10};
@@ -80,6 +94,8 @@ uint32_t run_tests(void)
 	/* 1874*100%=1874；8.91891码/A：3.5A向上取32码，2.0A向下取17码。 */
 	const uint16_t scene1_boost=1874,load_on_adc=32,load_off_adc=17;
 	const uint16_t startup_ms=100,load_on_ms=20,load_off_ms=100;
+	/* 18A向下取160码；1874*30%=562，3档正常100%=1874。 */
+	const uint16_t scene3_limit_adc=160,scene3_limit_duty=562,scene3_confirm_ms=200;
 #endif
 	uint8_t i;
 	uint16_t elapsed;
@@ -161,5 +177,46 @@ uint32_t run_tests(void)
 	CHECK(tool_mode_duty(281)==scene_duty[0]);
 	for(elapsed=1;elapsed<load_on_ms;elapsed++) CHECK(tick_mode_duty()==scene_duty[0]);
 	CHECK(tick_mode_duty()==scene1_boost);
+
+	/* 三档严格边界读取配置：等于门限不累计，多一码必须连续满配置的真实毫秒时间。 */
+	test_case=13;
+	prepare_forward_scene3(scene3_limit_adc-1);
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	user_list.IBusAvgScene_Adc=scene3_limit_adc;
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	for(elapsed=0;elapsed<scene3_confirm_ms+3;elapsed++) CHECK(tick_mode_duty()==scene_duty[2]);
+	user_list.IBusAvgScene_Adc=scene3_limit_adc+1;
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	for(elapsed=1;elapsed<scene3_confirm_ms;elapsed++) CHECK(tick_mode_duty()==scene_duty[2]);
+	CHECK(tick_mode_duty()==scene3_limit_duty);
+	CHECK(tool_mode_duty(281)==scene3_limit_duty && tool_mode_duty(1874)==scene3_limit_duty);
+
+	/* 按住电流回落或撤销许可不清锁存，松开后正常目标也读取三档正常配置。 */
+	test_case=14;
+	user_list.IBusAvgScene_Adc=0;
+	user_list.flag.bits.gToolEn=0;
+	CHECK(tool_mode_duty(281)==scene3_limit_duty);
+	user_list.flag.bits.gToolEn=1;
+	CHECK(tool_mode_duty(281)==scene3_limit_duty);
+	user_list.flag.bits.gToolTrigger=0;
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	user_list.flag.bits.gToolTrigger=1;
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	user_list.IBusAvgScene_Adc=scene3_limit_adc+1;
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	for(elapsed=1;elapsed<scene3_confirm_ms;elapsed++) CHECK(tick_mode_duty()==scene_duty[2]);
+	CHECK(tick_mode_duty()==scene3_limit_duty);
+
+	/* 等于门限打断确认：旧时间不能累计到下一段超限，需重新满足配置的72/73或199/200ms。 */
+	test_case=15;
+	prepare_forward_scene3(scene3_limit_adc+1);
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	for(elapsed=1;elapsed<scene3_confirm_ms;elapsed++) CHECK(tick_mode_duty()==scene_duty[2]);
+	user_list.IBusAvgScene_Adc=scene3_limit_adc;
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	user_list.IBusAvgScene_Adc=scene3_limit_adc+1;
+	CHECK(tool_mode_duty(281)==scene_duty[2]);
+	for(elapsed=1;elapsed<scene3_confirm_ms;elapsed++) CHECK(tick_mode_duty()==scene_duty[2]);
+	CHECK(tick_mode_duty()==scene3_limit_duty);
 	return 0;
 }

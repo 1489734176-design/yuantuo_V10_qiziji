@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / '.planning/2026-11-06-scene-seat-stop/control-tests'
+OUT = ROOT / '.planning/2026-11-09-scene3-current-duty/control-tests'
 KEIL = Path('D:/Users/mym02/AppData/Local/Keil_v5')
 spec = importlib.util.spec_from_file_location('battery_runner', ROOT / 'tests/battery_com/run_tests.py')
 runner = importlib.util.module_from_spec(spec)
@@ -94,7 +94,7 @@ def main():
                '-mcpu=cortex-m0', '-std=c99', '-O1', '-g', '-fshort-enums', '-ffunction-sections',
                '-fdata-sections', '-DUSE_STDPERIPH_DRIVER', '-DUSE_5V', '-Wall', '-Wextra', '-Werror',
                '-Wno-invalid-source-encoding', '-Wno-nonportable-include-path', '-Wno-unused-variable',
-               '-Wl,--ro-base=0x08000000,--rw-base=0x20000000,--entry=run_tests',
+               '-Wl,--ro-base=0x08010000,--rw-base=0x20000000,--entry=run_tests',
                '-o', str(image), str(source), str(prefix / 'USER/flash_data_save.c')]
     if not args.baseline:
         command.append(str(ROOT / 'USER/tool_mode.c'))

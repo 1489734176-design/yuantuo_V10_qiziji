@@ -974,9 +974,10 @@ static void seat_stop_run_permissions(void)
 	machine_error_hold.MC_error_hold.word=0;
 }
 
-/** @brief 在停止态调用真实处理清除跨用例计数，再建立正转情景指定档位。 */
+/** @brief 清除跨用例计数后建立正转情景指定档位，并以零电流走完现有150ms启动屏蔽。 */
 static void seat_stop_fixture(uint8_t gear)
 {
+	uint16_t i;
 	erase_fixture(); boot_fixture();
 	bat_can_run=1;
 	user_list.flag.bits.gAutoStop=0;
@@ -990,6 +991,7 @@ static void seat_stop_fixture(uint8_t gear)
 	tool_mode_key_event(TOOL_MODE_KEY_SCENE);
 	while(--gear) tool_mode_key_event(TOOL_MODE_KEY_SCENE);
 	seat_stop_run_permissions();
+	for(i=0;i<150;i++) user_screw_seat_stop_handle();
 }
 
 /** @brief 每次调用代表一份1ms峰值样本，不使用PWM查询次数或模式时钟代替计时。 */
@@ -998,10 +1000,16 @@ static void seat_stop_samples(uint16_t milliseconds)
 	while(milliseconds--) user_screw_seat_stop_handle();
 }
 
-/** @brief 使用需求中的25A/30A独立构造ADC边界，不从被测新阈值宏计算期望。 */
+/** @brief 手算当前20A/25A峰值阈值178/222码，避免旧到位参数与新18A降速混淆。 */
 static uint16_t seat_stop_threshold(uint8_t gear)
 {
-	return (uint16_t)((gear==2 ? 25.0f : 30.0f)*CURRENT_ADC_PER_A);
+	return gear==2 ? 178 : 222;
+}
+
+/** @brief 使用当前2档50ms、3档100ms到位时间，期望与被测宏独立构造。 */
+static uint16_t seat_stop_confirm_count(uint8_t gear)
+{
+	return gear==2 ? 50 : 100;
 }
 
 /** @brief 验证使能只取决于当前正转情景2/3档，停止态仍显示模式许可。 */
@@ -1041,7 +1049,7 @@ static void test_seat_stop_enable_scope(void)
 	}
 }
 
-/** @brief 验证情景2档25A严格边界与第99/100份样本，不屏蔽起动后的首个样本。 */
+/** @brief 验证情景2档20A严格边界、49/50份样本以及现有150ms启动屏蔽。 */
 static void test_seat_stop_gear2_boundary(void)
 {
 	seat_stop_fixture(2);
@@ -1049,15 +1057,17 @@ static void test_seat_stop_gear2_boundary(void)
 	seat_stop_samples(200);
 	CHECK(user_list.flag.bits.gAutoStopEn && !user_list.flag.bits.gAutoStop);
 	user_list.IBusPeak_Adc=seat_stop_threshold(2)+1;
-	seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+	seat_stop_samples(49); CHECK(!user_list.flag.bits.gAutoStop);
 	seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 	seat_stop_fixture(2);
+	user_list.CW_Auto_Mask_count=0;
 	user_list.IBusPeak_Adc=seat_stop_threshold(2)+1;
-	seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+	seat_stop_samples(150); CHECK(!user_list.flag.bits.gAutoStop);
+	seat_stop_samples(49); CHECK(!user_list.flag.bits.gAutoStop);
 	seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 }
 
-/** @brief 验证情景3档仅在严格超过30A时计数，25A以上但30A以下不能停机。 */
+/** @brief 验证情景3档严格超过25A才计数，20A以上但25A以下不能停机。 */
 static void test_seat_stop_gear3_boundary(void)
 {
 	seat_stop_fixture(3);
@@ -1090,31 +1100,36 @@ static void test_seat_stop_peak_only_and_no_pwm_side_effect(void)
 		user_list.IBusAvgScene_Adc=0;
 		user_list.IBusAvgOffsetValid=0;
 		user_list.Load_exist=0;
-		seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+		seat_stop_samples(seat_stop_confirm_count(gear)-1); CHECK(!user_list.flag.bits.gAutoStop);
 		seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 		CHECK(!user_list.Load_exist && !motor_control_list.pwm_duty_aim);
 		CHECK(motor_control_list.pwm_duty_virtual==321 && !mc_core_list.pwm_actual_runing_data);
 	}
 }
 
-/** @brief 验证一次等于阈值或低于阈值就清零进度，间断高电流不能累积成100ms。 */
+/** @brief 验证现有低样本递减1，而足量低样本耗尽进度后必须重新累计完整确认时间。 */
 static void test_seat_stop_current_interruptions(void)
 {
-	uint8_t gear,below,repeat;
+	uint8_t gear,below;
 	for(gear=2;gear<=3;gear++)
 	{
 		for(below=0;below<2;below++)
 		{
 			seat_stop_fixture(gear);
-			for(repeat=0;repeat<3;repeat++)
-			{
-				user_list.IBusPeak_Adc=seat_stop_threshold(gear)+1;
-				seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
-				user_list.IBusPeak_Adc=below ? 0 : seat_stop_threshold(gear);
-				seat_stop_samples(1); CHECK(!user_list.flag.bits.gAutoStop);
-			}
 			user_list.IBusPeak_Adc=seat_stop_threshold(gear)+1;
-			seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+			seat_stop_samples(seat_stop_confirm_count(gear)-1); CHECK(!user_list.flag.bits.gAutoStop);
+			user_list.IBusPeak_Adc=below ? 0 : seat_stop_threshold(gear);
+			seat_stop_samples(1); CHECK(!user_list.flag.bits.gAutoStop);
+			user_list.IBusPeak_Adc=seat_stop_threshold(gear)+1;
+			seat_stop_samples(1); CHECK(!user_list.flag.bits.gAutoStop);
+			seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
+			seat_stop_fixture(gear);
+			user_list.IBusPeak_Adc=seat_stop_threshold(gear)+1;
+			seat_stop_samples(seat_stop_confirm_count(gear)-1); CHECK(!user_list.flag.bits.gAutoStop);
+			user_list.IBusPeak_Adc=below ? 0 : seat_stop_threshold(gear);
+			seat_stop_samples(seat_stop_confirm_count(gear)); CHECK(!user_list.flag.bits.gAutoStop);
+			user_list.IBusPeak_Adc=seat_stop_threshold(gear)+1;
+			seat_stop_samples(seat_stop_confirm_count(gear)-1); CHECK(!user_list.flag.bits.gAutoStop);
 			seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 		}
 	}
@@ -1130,7 +1145,7 @@ static void test_seat_stop_run_and_fault_resets(void)
 		{
 			seat_stop_fixture(gear);
 			user_list.IBusPeak_Adc=seat_stop_threshold(gear)+1;
-			seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+			seat_stop_samples(seat_stop_confirm_count(gear)-1); CHECK(!user_list.flag.bits.gAutoStop);
 			if(gate==0) user_list.flag.bits.gToolTrigger=0;
 			if(gate==1) user_list.flag.bits.gToolEn=0;
 			if(gate==2) mc_core_list.motor_en=0;
@@ -1145,7 +1160,8 @@ static void test_seat_stop_run_and_fault_resets(void)
 			seat_stop_samples(150);
 			CHECK(user_list.flag.bits.gAutoStopEn && !user_list.flag.bits.gAutoStop);
 			seat_stop_run_permissions();
-			seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+			seat_stop_samples(150); CHECK(!user_list.flag.bits.gAutoStop);
+			seat_stop_samples(seat_stop_confirm_count(gear)-1); CHECK(!user_list.flag.bits.gAutoStop);
 			seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 		}
 	}
@@ -1159,7 +1175,7 @@ static void test_seat_stop_selection_resets(void)
 	{
 		seat_stop_fixture(2);
 		user_list.IBusPeak_Adc=1000;
-		seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+		seat_stop_samples(49); CHECK(!user_list.flag.bits.gAutoStop);
 		if(selection==0) tool_mode_current()->scene_gear=1;
 		if(selection==1) tool_mode_current()->scene_gear=4;
 		if(selection==2) tool_mode_current()->mode=TOOL_MODE_SPEED;
@@ -1169,7 +1185,8 @@ static void test_seat_stop_selection_resets(void)
 		direction(TOOL_DIRECTION_FORWARD);
 		tool_mode_current()->mode=TOOL_MODE_SCENE;
 		tool_mode_current()->scene_gear=2;
-		seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+		seat_stop_samples(150); CHECK(!user_list.flag.bits.gAutoStop);
+		seat_stop_samples(49); CHECK(!user_list.flag.bits.gAutoStop);
 		seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 	}
 }
@@ -1183,14 +1200,14 @@ static void test_seat_stop_gear_change_resets(void)
 		seat_stop_fixture(gear);
 		user_list.gears_level=0;
 		user_list.IBusPeak_Adc=1000;
-		seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+		seat_stop_samples(seat_stop_confirm_count(gear)-1); CHECK(!user_list.flag.bits.gAutoStop);
 		tool_mode_current()->scene_gear=gear==2 ? 3 : 2;
-		seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+		seat_stop_samples(seat_stop_confirm_count(gear==2 ? 3 : 2)-1); CHECK(!user_list.flag.bits.gAutoStop);
 		seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 	}
 	seat_stop_fixture(2);
 	user_list.IBusPeak_Adc=seat_stop_threshold(2)+1;
-	seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+	seat_stop_samples(49); CHECK(!user_list.flag.bits.gAutoStop);
 	tool_mode_current()->speed_gear=4;
 	user_list.gears_level=3;
 	seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
@@ -1213,13 +1230,13 @@ static void test_seat_stop_preserves_existing_latch(void)
 	CHECK(!user_list.flag.bits.gAutoStopEn && user_list.flag.bits.gAutoStop);
 }
 
-/** @brief 验证真实状态机撤销使能并保持停机，只有松扳机后解除锁存且下次重新计满100ms。 */
+/** @brief 验证真实状态机到位停机锁存，松扳机后下一次仍需150ms屏蔽和50ms到位确认。 */
 static void test_seat_stop_state_machine_release(void)
 {
 	uint16_t i;
 	seat_stop_fixture(2);
 	user_list.IBusPeak_Adc=seat_stop_threshold(2)+1;
-	seat_stop_samples(100); CHECK(user_list.flag.bits.gAutoStop);
+	seat_stop_samples(50); CHECK(user_list.flag.bits.gAutoStop);
 	user_state_control();
 	CHECK(user_list.user_state==TOOL_STOP && !user_list.flag.bits.gToolEn);
 	mc_core_list.motor_en=0;
@@ -1238,7 +1255,8 @@ static void test_seat_stop_state_machine_release(void)
 	user_state_control(); CHECK(user_list.user_state==TOOL_RUN && user_list.flag.bits.gToolEn);
 	mc_core_list.motor_en=1;
 	motor_control_list.bldc_state=MOTOR_RUN;
-	seat_stop_samples(99); CHECK(!user_list.flag.bits.gAutoStop);
+	seat_stop_samples(150); CHECK(!user_list.flag.bits.gAutoStop);
+	seat_stop_samples(49); CHECK(!user_list.flag.bits.gAutoStop);
 	seat_stop_samples(1); CHECK(user_list.flag.bits.gAutoStop);
 }
 
@@ -1258,16 +1276,16 @@ static void seat_stop_peak_protection_fixture(uint8_t gear)
 	seat_stop_run_permissions();
 }
 
-/** @brief 验证实时峰值故障抢在到位第100样本前撤销电机许可，下一帧状态机才消费锁存。 */
+/** @brief 验证原80A积分峰值故障在第11帧抢先撤销电机许可，阻止到位第100样本停机。 */
 static void test_seat_stop_gear3_existing_protection_priority(void)
 {
 	uint16_t i;
 	seat_stop_peak_protection_fixture(3);
-	/* 预置49份到位样本，再处理50帧实际电流；故障当帧正好是到位的第100份样本。 */
-	user_list.IBusPeak_Adc=seat_stop_threshold(3)+1;
-	seat_stop_samples(49); CHECK(!user_list.flag.bits.gAutoStop);
-	mc_core_list.Board_ADC_DATA.u16I_Peak=100+seat_stop_threshold(3)+1;
-	for(i=0;i<50;i++)
+	/* 714码严格超过80A；3276积分步长，10帧32760，11帧才达到32768。 */
+	user_list.IBusPeak_Adc=714;
+	seat_stop_samples(89); CHECK(!user_list.flag.bits.gAutoStop);
+	mc_core_list.Board_ADC_DATA.u16I_Peak=814;
+	for(i=0;i<10;i++)
 	{
 		test_main_control_frame();
 		CHECK(!user_list.userErr.bits.gIBusPeakOCP1 && !user_list.flag.bits.gAutoStop);
@@ -1286,13 +1304,13 @@ static void test_seat_stop_gear3_existing_protection_priority(void)
 	CHECK(user_list.userErr.bits.gIBusPeakOCP1 && machine_error_hold.userErr_hold.bits.gIBusPeakOCP1);
 }
 
-/** @brief 验证2档25A/100ms在现有25A/120ms保护之前提出普通停机，保留原故障保护参数。 */
+/** @brief 验证2档20A/50ms到位停机，20A输入不能冒充原25A峰值故障。 */
 static void test_seat_stop_gear2_real_peak_sampling(void)
 {
 	uint16_t i;
 	seat_stop_peak_protection_fixture(2);
 	mc_core_list.Board_ADC_DATA.u16I_Peak=100+seat_stop_threshold(2)+1;
-	for(i=0;i<99;i++)
+	for(i=0;i<49;i++)
 	{
 		test_main_control_frame();
 		CHECK(!user_list.userErr.bits.gIBusPeakOCP1 && !user_list.flag.bits.gAutoStop);
@@ -1303,6 +1321,394 @@ static void test_seat_stop_gear2_real_peak_sampling(void)
 	CHECK(user_list.flag.bits.gAutoStop && user_list.user_state==TOOL_STOP && !user_list.flag.bits.gToolEn);
 	CHECK(!mc_core_list.motor_en);
 	CHECK(!user_list.userErr.bits.gIBusPeakOCP1 && !machine_error_hold.userErr_hold.word);
+}
+
+/** @brief 建立正转情景3档与有效AVG校准，保留实际模式目标和PWM处理入口。 */
+static void scene3_limit_fixture(void)
+{
+	erase_fixture(); boot_fixture();
+	direction(TOOL_DIRECTION_FORWARD);
+	tool_mode_current()->mode=TOOL_MODE_SCENE;
+	tool_mode_current()->scene_gear=3;
+	seat_stop_run_permissions();
+	user_list.flag.bits.gAutoStop=0;
+	user_list.IBusAvgOffset_Adc=432;
+	user_list.IBusAvgOffsetValid=1;
+	user_list.IBusAvgScene_Adc=0;
+	user_list.IBusAvg_Adc=0;
+	user_list.IBusPeak_Adc=0;
+}
+
+/** @brief 捕获18A严格边界及200ms消抖错误：160码不累计，161码持续199/200ms才锁为30%。 */
+static void test_scene3_limit_current_boundary(void)
+{
+	scene3_limit_fixture();
+	user_list.IBusAvgScene_Adc=159;
+	CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvgScene_Adc=160;
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(1000); CHECK(tool_mode_duty(1874)==1874);
+	user_list.IBusAvgScene_Adc=161;
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(199); CHECK(tool_mode_duty(1874)==1874);
+	tick_ms(1); CHECK(tool_mode_duty(281)==562);
+	CHECK(tool_mode_duty(1874)==562);
+}
+
+/** @brief 保持夹具提供的超限电流，首次真实目标查询后推进完整200ms供锁存回归使用。 */
+static void scene3_limit_confirm(void)
+{
+	(void)tool_mode_duty(281);
+	tick_ms(200);
+}
+
+/** @brief 捕获电流回落误清锁存：同次扣动降到零电流并等待仍维持30%。 */
+static void test_scene3_limit_current_drop_latches(void)
+{
+	scene3_limit_fixture();
+	user_list.IBusAvgScene_Adc=161;
+	scene3_limit_confirm();
+	CHECK(tool_mode_duty(281)==562);
+	user_list.IBusAvgScene_Adc=159;
+	tick_ms(5000); CHECK(tool_mode_duty(1874)==562);
+	user_list.IBusAvgScene_Adc=0;
+	tick_ms(5000); CHECK(tool_mode_duty(281)==562);
+}
+
+/** @brief 撤销单项运行许可或设置故障，测试真实目标函数的进入门控及已触发后的保持行为。 */
+static void scene3_limit_remove_permission(uint8_t gate)
+{
+	if(gate==0) user_list.flag.bits.gToolEn=0;
+	if(gate==1) mc_core_list.motor_en=0;
+	if(gate==2) user_list.user_state=TOOL_STOP;
+	if(gate==3) motor_control_list.bldc_state=MOTOR_HBRAKE;
+	if(gate==4) user_list.IBusAvgOffsetValid=0;
+	if(gate==5) user_list.userErr.bits.gNtcMos=1;
+	if(gate==6) mc_core_list.MC_error.bits.gBlock=1;
+	if(gate==7) machine_error_hold.userErr_hold.bits.gVBusStbUVP=1;
+	if(gate==8) machine_error_hold.MC_error_hold.bits.gBlock=1;
+	if(gate==9) user_list.flag.bits.gAutoStop=1;
+}
+
+/** @brief 捕获许可恢复后误升速：停机、校准无效、实时或锁存故障都不清本次降速锁存。 */
+static void test_scene3_limit_permission_drop_latches(void)
+{
+	uint8_t gate;
+	for(gate=0;gate<10;gate++)
+	{
+		scene3_limit_fixture();
+		user_list.IBusAvgScene_Adc=161;
+		scene3_limit_confirm();
+		CHECK(tool_mode_duty(281)==562);
+		scene3_limit_remove_permission(gate);
+		user_list.IBusAvgScene_Adc=0;
+		tick_ms(5000); CHECK(tool_mode_duty(281)==562);
+		seat_stop_run_permissions();
+		user_list.IBusAvgOffsetValid=1;
+		user_list.flag.bits.gAutoStop=0;
+		CHECK(tool_mode_duty(1874)==562);
+	}
+}
+
+/** @brief 捕获首次触发门控错误：许可或校准无效及故障期间不累计，恢复后重新连续确认200ms。 */
+static void test_scene3_limit_entry_permissions(void)
+{
+	uint8_t gate;
+	for(gate=0;gate<10;gate++)
+	{
+		scene3_limit_fixture();
+		user_list.IBusAvgScene_Adc=161;
+		scene3_limit_remove_permission(gate);
+		CHECK(tool_mode_duty(281)==1874);
+		tick_ms(1000); CHECK(tool_mode_duty(281)==1874);
+		seat_stop_run_permissions();
+		user_list.IBusAvgOffsetValid=1;
+		user_list.flag.bits.gAutoStop=0;
+		user_list.IBusAvgScene_Adc=159;
+		CHECK(tool_mode_duty(281)==1874);
+		user_list.IBusAvgScene_Adc=161;
+		CHECK(tool_mode_duty(1874)==1874);
+		tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+		tick_ms(1); CHECK(tool_mode_duty(1874)==562);
+	}
+}
+
+/** @brief 捕获松扳机未复位：松开恢复100%，低电流重按正常且本轮仍可再次连续超限200ms降速。 */
+static void test_scene3_limit_trigger_release_rearms(void)
+{
+	scene3_limit_fixture();
+	user_list.flag.bits.gToolTrigger=0;
+	user_list.IBusAvgScene_Adc=161;
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(1000); CHECK(tool_mode_duty(281)==1874);
+	user_list.flag.bits.gToolTrigger=1;
+	user_list.IBusAvgScene_Adc=159;
+	CHECK(tool_mode_duty(281)==1874);
+	user_list.IBusAvgScene_Adc=161;
+	scene3_limit_confirm();
+	CHECK(tool_mode_duty(1874)==562);
+	/* 已锁存且许可撤销时，松扳机也必须解除，不得等待电机重新许可。 */
+	user_list.flag.bits.gToolEn=0;
+	mc_core_list.motor_en=0;
+	user_list.flag.bits.gToolTrigger=0;
+	CHECK(tool_mode_duty(281)==1874);
+	seat_stop_run_permissions();
+	user_list.IBusAvgScene_Adc=0;
+	CHECK(tool_mode_duty(1874)==1874);
+	user_list.IBusAvgScene_Adc=161;
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+	tick_ms(1); CHECK(tool_mode_duty(281)==562);
+}
+
+/** @brief 捕获跨选择残留：离开3档、换模式、换向或初始化后重新进入均恢复正常目标。 */
+static void test_scene3_limit_selection_resets(void)
+{
+	uint8_t selection;
+	for(selection=0;selection<5;selection++)
+	{
+		scene3_limit_fixture();
+		user_list.IBusAvgScene_Adc=161;
+		scene3_limit_confirm();
+		CHECK(tool_mode_duty(281)==562);
+		if(selection==0) tool_mode_current()->mode=TOOL_MODE_SPEED;
+		if(selection==1) tool_mode_current()->scene_gear=2;
+		if(selection==2) tool_mode_current()->scene_gear=1;
+		if(selection==3) direction(TOOL_DIRECTION_REVERSE);
+		if(selection==4) tool_mode_init();
+		(void)tool_mode_duty(281);
+		direction(TOOL_DIRECTION_FORWARD);
+		tool_mode_current()->mode=TOOL_MODE_SCENE;
+		tool_mode_current()->scene_gear=3;
+		user_list.IBusAvgScene_Adc=159;
+		CHECK(tool_mode_duty(281)==1874);
+		user_list.IBusAvgScene_Adc=161;
+		CHECK(tool_mode_duty(1874)==1874);
+		tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+		tick_ms(1); CHECK(tool_mode_duty(1874)==562);
+	}
+}
+
+/** @brief 捕获作用范围扩大：各调速档及情景1/2档、反转情景仍执行各自既有目标。 */
+static void test_scene3_limit_mode_scope(void)
+{
+	const uint16_t speed_max[]={712,1086,1461,1874};
+	uint8_t gear;
+	for(gear=1;gear<=4;gear++)
+	{
+		scene3_limit_fixture();
+		tool_mode_current()->mode=TOOL_MODE_SPEED;
+		tool_mode_current()->speed_gear=gear;
+		user_list.IBusAvgScene_Adc=161;
+		CHECK(tool_mode_duty(1874)==speed_max[gear-1]);
+		tick_ms(500); CHECK(tool_mode_duty(1874)==speed_max[gear-1]);
+	}
+	scene3_limit_fixture();
+	tool_mode_current()->scene_gear=1;
+	user_list.IBusAvgScene_Adc=161;
+	CHECK(tool_mode_duty(281)==337);
+	tick_ms(100); CHECK(tool_mode_duty(281)==337);
+	tick_ms(20); CHECK(tool_mode_duty(281)==1874);
+	scene3_limit_fixture();
+	tool_mode_current()->scene_gear=2;
+	user_list.IBusAvgScene_Adc=161;
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(500); CHECK(tool_mode_duty(281)==1874);
+	scene3_limit_fixture();
+	direction(TOOL_DIRECTION_REVERSE);
+	tool_mode_current()->mode=TOOL_MODE_SCENE;
+	user_list.IBusAvgScene_Adc=161;
+	CHECK(tool_mode_duty(281)==1874);
+	tick_ms(500); CHECK(tool_mode_duty(281)==1874);
+}
+
+/** @brief 捕获误用峰值零点或未校准电流：真实AVG独立零偏/VCC增益跨过160码后才连续确认200ms。 */
+static void test_scene3_limit_calibrated_current(void)
+{
+	const uint16_t gains[]={32768,49152};
+	const uint16_t equal_raw[]={592,539};
+	const uint16_t over_raw[]={593,540};
+	const uint16_t over_current[]={161,162};
+	const uint16_t protection_equal[]={141,132};
+	const uint16_t protection_over[]={142,133};
+	uint8_t gain;
+	for(gain=0;gain<2;gain++)
+	{
+		scene3_limit_fixture();
+		user_list.Vcc_cal_gain=gains[gain];
+		mc_core_list.CurrentOffset_ad_data=451;
+		mc_core_list.Board_ADC_DATA.u16I_Peak=463;
+		mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=equal_raw[gain];
+		user_oc_handle(); user_gears_handle();
+		CHECK(user_list.IBusAvgScene_Adc==160 && user_list.IBusAvg_Adc==protection_equal[gain]);
+		CHECK(motor_control_list.pwm_duty_aim==1874);
+		tick_ms(500); user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+		mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=over_raw[gain];
+		user_oc_handle(); user_gears_handle();
+		CHECK(user_list.IBusAvgScene_Adc==over_current[gain] && user_list.IBusAvg_Adc==protection_over[gain]);
+		CHECK(motor_control_list.pwm_duty_aim==1874);
+		tick_ms(199); user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+		tick_ms(1); user_gears_handle();
+		CHECK(motor_control_list.pwm_duty_aim==562);
+		CHECK(!user_list.userErr.word && !mc_core_list.MC_error.word);
+		mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=431;
+		user_oc_handle(); user_gears_handle();
+		CHECK(user_list.IBusAvgScene_Adc==0 && motor_control_list.pwm_duty_aim==562);
+	}
+}
+
+/** @brief 捕获绕过软坡：100%降30%沿实际pwm_set单调下降，回落不升速，松扳机后可软升回100%。 */
+static void test_scene3_limit_real_pwm_ramp(void)
+{
+	uint16_t i,previous;
+	scene3_limit_fixture();
+	user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+	motor_control_list.pwm_duty_virtual=1874;
+	mc_core_list.pwm_actual_runing_data=1874;
+	last_pwm=1874;
+	user_list.IBusAvgScene_Adc=161;
+	user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+	tick_ms(199); user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+	tick_ms(1); user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==562);
+	CHECK(motor_control_list.pwm_duty_virtual==1874 && mc_core_list.pwm_actual_runing_data==1874);
+	pwm_set(); CHECK(last_pwm>562 && last_pwm<=1874);
+	previous=last_pwm;
+	for(i=0;i<9000;i++)
+	{
+		pwm_set(); CHECK(last_pwm<=previous && last_pwm>=562); previous=last_pwm;
+	}
+	CHECK(last_pwm==562);
+	user_list.IBusAvgScene_Adc=0;
+	user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==562);
+	for(i=0;i<100;i++) { pwm_set(); CHECK(last_pwm==562); }
+	user_list.flag.bits.gToolTrigger=0;
+	user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+	seat_stop_run_permissions();
+	user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+	previous=562;
+	for(i=0;i<9000;i++)
+	{
+		pwm_set(); CHECK(last_pwm>=previous && last_pwm<=1874); previous=last_pwm;
+	}
+	CHECK(last_pwm==1874);
+}
+
+/** @brief 捕获降速旁路故障保护：真实主循环在已锁存30%时仍由实时热故障撤销电机并消费锁存。 */
+static void test_scene3_limit_preserves_fault_gate(void)
+{
+	uint16_t i;
+	scene3_limit_fixture();
+	user_list.Vcc_cal_gain=32768;
+	mc_core_list.CurrentOffset_ad_data=451;
+	mc_core_list.Board_ADC_DATA.u16I_Peak=451;
+	mc_core_list.Board_ADC_DATA.u16I_SUM_Avg=593;
+	test_main_control_frame(); user_gears_handle();
+	CHECK(motor_control_list.pwm_duty_aim==1874 && mc_core_list.motor_en);
+	for(i=0;i<199;i++)
+	{
+		tick_ms(1); test_main_control_frame(); user_gears_handle();
+		CHECK(motor_control_list.pwm_duty_aim==1874 && mc_core_list.motor_en);
+	}
+	tick_ms(1); test_main_control_frame(); user_gears_handle();
+	CHECK(motor_control_list.pwm_duty_aim==562 && mc_core_list.motor_en);
+	user_list.userErr.bits.gNtcMos=1;
+	test_main_control_frame(); user_gears_handle();
+	CHECK(machine_error_hold.userErr_hold.bits.gNtcMos && !mc_core_list.motor_en);
+	CHECK(motor_control_list.pwm_duty_aim==562 && !user_list.flag.bits.gAutoStop);
+	test_main_control_frame();
+	CHECK(user_list.user_state==TOOL_ERROR_STOP && !mc_core_list.motor_en);
+	test_main_control_frame();
+	CHECK(!user_list.flag.bits.gToolEn && !mc_core_list.motor_en);
+	CHECK(tool_mode_duty(281)==562);
+}
+
+/** @brief 捕获按调用次数计时：同一毫秒重复查询及目标处理不能将199ms提前凑成200ms。 */
+static void test_scene3_limit_repeated_calls_do_not_advance_time(void)
+{
+	uint16_t i;
+	scene3_limit_fixture();
+	user_list.IBusAvgScene_Adc=161;
+	CHECK(tool_mode_duty(281)==1874);
+	for(i=0;i<1000;i++)
+	{
+		user_gears_handle(); CHECK(motor_control_list.pwm_duty_aim==1874);
+		CHECK(tool_mode_duty(1874)==1874);
+	}
+	tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+	for(i=0;i<1000;i++) CHECK(tool_mode_duty(281)==1874);
+	tick_ms(1); CHECK(tool_mode_duty(281)==562);
+}
+
+/** @brief 捕获断续超限累计：每份零电流、低电流或等于160码的样本都清确认，重新满足完整200ms。 */
+static void test_scene3_limit_current_interruptions_reset_confirmation(void)
+{
+	const uint16_t interruptions[]={0,159,160};
+	uint8_t current,repeat;
+	for(current=0;current<3;current++)
+	{
+		scene3_limit_fixture();
+		for(repeat=0;repeat<3;repeat++)
+		{
+			user_list.IBusAvgScene_Adc=161;
+			CHECK(tool_mode_duty(281)==1874);
+			tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+			user_list.IBusAvgScene_Adc=interruptions[current];
+			CHECK(tool_mode_duty(281)==1874);
+		}
+		user_list.IBusAvgScene_Adc=161;
+		CHECK(tool_mode_duty(281)==1874);
+		tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+		tick_ms(1); CHECK(tool_mode_duty(281)==562);
+	}
+}
+
+/** @brief 捕获确认期间许可短失效未清计时：任一运行、AVG或故障门控中断后必须重计200ms。 */
+static void test_scene3_limit_permission_interruptions_reset_confirmation(void)
+{
+	uint8_t gate;
+	for(gate=0;gate<10;gate++)
+	{
+		scene3_limit_fixture();
+		user_list.IBusAvgScene_Adc=161;
+		CHECK(tool_mode_duty(281)==1874);
+		tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+		scene3_limit_remove_permission(gate);
+		CHECK(tool_mode_duty(281)==1874);
+		tick_ms(1); CHECK(tool_mode_duty(281)==1874);
+		seat_stop_run_permissions();
+		user_list.IBusAvgOffsetValid=1;
+		user_list.flag.bits.gAutoStop=0;
+		CHECK(tool_mode_duty(281)==1874);
+		tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+		tick_ms(1); CHECK(tool_mode_duty(281)==562);
+	}
+}
+
+/** @brief 捕获松扳机或跨选择残留确认：在199ms离开本轮后重进必须从首次超限观察重新计时。 */
+static void test_scene3_limit_pending_selection_resets(void)
+{
+	uint8_t selection;
+	for(selection=0;selection<6;selection++)
+	{
+		scene3_limit_fixture();
+		user_list.IBusAvgScene_Adc=161;
+		CHECK(tool_mode_duty(281)==1874);
+		tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+		if(selection==0) user_list.flag.bits.gToolTrigger=0;
+		if(selection==1) tool_mode_current()->mode=TOOL_MODE_SPEED;
+		if(selection==2) tool_mode_current()->scene_gear=2;
+		if(selection==3) tool_mode_current()->scene_gear=1;
+		if(selection==4) direction(TOOL_DIRECTION_REVERSE);
+		if(selection==5) tool_mode_init();
+		(void)tool_mode_duty(281);
+		direction(TOOL_DIRECTION_FORWARD);
+		tool_mode_current()->mode=TOOL_MODE_SCENE;
+		tool_mode_current()->scene_gear=3;
+		seat_stop_run_permissions();
+		CHECK(tool_mode_duty(281)==1874);
+		tick_ms(199); CHECK(tool_mode_duty(281)==1874);
+		tick_ms(1); CHECK(tool_mode_duty(281)==562);
+	}
 }
 #endif
 
@@ -1341,5 +1747,15 @@ void run_tests(void)
 	RUN(41,test_seat_stop_selection_resets); RUN(42,test_seat_stop_gear_change_resets);
 	RUN(43,test_seat_stop_preserves_existing_latch); RUN(44,test_seat_stop_state_machine_release);
 	RUN(45,test_seat_stop_gear3_existing_protection_priority); RUN(46,test_seat_stop_gear2_real_peak_sampling);
+	RUN(47,test_scene3_limit_current_boundary);
+	RUN(48,test_scene3_limit_current_drop_latches); RUN(49,test_scene3_limit_permission_drop_latches);
+	RUN(50,test_scene3_limit_entry_permissions); RUN(51,test_scene3_limit_trigger_release_rearms);
+	RUN(52,test_scene3_limit_selection_resets); RUN(53,test_scene3_limit_mode_scope);
+	RUN(54,test_scene3_limit_calibrated_current); RUN(55,test_scene3_limit_real_pwm_ramp);
+	RUN(56,test_scene3_limit_preserves_fault_gate);
+	RUN(57,test_scene3_limit_repeated_calls_do_not_advance_time);
+	RUN(58,test_scene3_limit_current_interruptions_reset_confirmation);
+	RUN(59,test_scene3_limit_permission_interruptions_reset_confirmation);
+	RUN(60,test_scene3_limit_pending_selection_resets);
 #endif
 }
